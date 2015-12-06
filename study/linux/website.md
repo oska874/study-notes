@@ -13,6 +13,7 @@
  - [osdev](http://wiki.osdev.org/Main_Page) 该站点描述了创建操作系统的相关信息,并且有丰富的社区
  - [Linux insides](https://www.gitbook.com/book/0xax/linux-insides/details) 该站点提供了一本较为现代的关于 Linux 内核和其内部实现的电子书
  - [LinuxMM](http://linux-mm.org/) 该站点是关于 Linux 内存管理的站点
+ - [LWN.net](lwn.net)
 
 2、国内站点
  - [泰晓科技](http://www.tinylab.org/) 这个站点有许多翻译项目，并且有很多最新的 Linux 资讯 
@@ -33,3 +34,4 @@
 贡献者：
 [YuanbinZhou](https://github.com/hduffddybz)
 [shui](https://github.com/shui8023)
+[ezio](https://github.com/oska874)
