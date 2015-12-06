@@ -28,6 +28,8 @@
  - [4.3 内核的中文注释](https://code.csdn.net/xiebaoyou/linux-4-3-0-comment/tree/master/) 该站点为 perfbook 翻译者谢宝友发起的 4.3 内核的中文注释项目
  - [jserv's wiki](http://wiki.csie.ncku.edu.tw/_categories) 该站点为台湾著名开源贡献者 jserv 所教授大学的 wiki，有许多关于 Linux，virtualization，ARM 等资料
 
+3、网络相关
+ - [Lubomir Rintel's web log](https://blogs.gnome.org/lkundrak/) network manager hacker
 贡献者：
 [YuanbinZhou](https://github.com/hduffddybz)
 [shui](https://github.com/shui8023)
