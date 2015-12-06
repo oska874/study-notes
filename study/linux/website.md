@@ -31,6 +31,11 @@
 
 3、网络相关
  - [Lubomir Rintel's web log](https://blogs.gnome.org/lkundrak/) network manager hacker
+
+4、工业控制相关
+ - [fieldbus](https://www.osadl.org/projects/svn/fieldbus-framework/trunks/fddi-trunk/): 现场总线
+ - [realtime QA farm ](https://www.osadl.org/QA-Farm-Realtime.qa-farm-about.0.html#c4712):During the development of a PREEMPT_RT patch series of a Linux kernel version, OSADL runs a number of tests to ensure such kernels are ready for production purposes. This QA activity includes monitored stress tests to detect
+
 贡献者：
 [YuanbinZhou](https://github.com/hduffddybz)
 [shui](https://github.com/shui8023)
