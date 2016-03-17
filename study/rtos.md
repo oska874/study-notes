@@ -14,6 +14,8 @@
 4. zephyr
 
   windriver 出品，和 lsf 联合发布的实时系统
+  
+  （docker 下编译有问题，待解决。）
 
 5. ChibiOS
 
