@@ -9,17 +9,17 @@
 
 3. zephyr
 
-  windriver 出品，和 lsf 联合发布的实时系统
+  windriver 出品，和 lsf 联合发布的实时系统，面向cortex m 和小型 x86处理器
   
   （docker 下编译有问题，待解决。）
 
 4. rt-thread
 
-  国产，功能丰富
+对 powerpc 和 arm cortex a 支持不如 mcu ，主要目标还是小系统
 
 5. mbed
 
-  arm 自主，物联网系统
+  arm 开发，物联网操作系统，主要是支持 mcu ，cortex m 系列，是对通用操作系统的补充
 
 6. ChibiOS
 	
