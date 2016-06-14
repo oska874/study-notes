@@ -7,7 +7,7 @@ sudo apt-get install autojump
 
 usage:
 
-配合 oh-my-zsh 很好用，安装了 oh-my-zsh 之后会把 autojump 重命名为 `j` , 可以这样使用：
+配合 oh-my-zsh 很好用（修改 `~/.zshrc` , 添加内容 `plugins=(autojump )`），安装了 oh-my-zsh 之后会把 autojump 重命名为 `j` , 可以这样使用：
 
 ```
 ➜  /os_dev  pwd
@@ -28,5 +28,5 @@ wo__2__/os_dev/workspace/test/ccc                                         wo__4_
 ```
 
 问题：
-  在 oh-my-zsh 环境下， autojump 命令本身反而有问题，不能用，原因不详
+  在 oh-my-zsh 环境下， 直接使用autojump 命令本身反而有问题，不能用，原因不详
 
