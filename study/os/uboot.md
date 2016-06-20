@@ -1,5 +1,6 @@
 
-1. make 命令
+## 1. make 命令
+
   详细命令可以使用 `make help` 或者文件 README 获取：
   
   ```
@@ -75,7 +76,8 @@ For further info see the ./README file
     - 如果不是编译 x86 的 uboot，还需要显式的指出 `ARCH` 和 `CROSS_COMPILE` ， 可以在执行 make 时附带 `ARCH=xxx CROSS_COMPILE=yyy` 编译，也可以设置环境变量（`export ARCH=xxx`)。
     - xxx_defconfig 和你的目标板有关，比如 beaglebone black 的配置文件是 am335x_boneblack_defconfig，具体的配置文件名称可以在目录 `configs`（新版 uboot）或者文件 `boards.cfg` (旧版 uboot） 下找到。
 
-2. make menuconfig
+## 2. make menuconfig
+
   新版的 u-boot 可以像 kernel 一样使用 menuconfig 配置参数（最新版的一定可以）
   
   ```
@@ -108,8 +110,101 @@ For further info see the ./README file
   
   注意，终端最小得是 80*19 大小。
 
-3. 添加自定义的开发板配置文件
+## 3. 添加自定义的开发板配置文件
+
   按照 `xxx_defconfig` 这样的名称在 configs 目录下创建文件即可。
   
+## 4. uboot shell 命令的实现
 
-  
+### 4.1. 添加命令
+
+以命令 `boot` 为例（`cmd/bootm.c`），添加该命令使用了下面的语句：
+
+```
+U_BOOT_CMD(
+    boot,   1,  1,  do_bootd,
+    "boot default, i.e., run 'bootcmd'",
+    ""
+);
+```
+
+这段语句可以这么理解：给 uboot 添加了一条 shell 命令 `boot`，它的作用是引导、启动操作系统(`boot default, i.e., run 'bootcmd'`)，实现命令的函数是 `do_bootd`。
+
+之所以这么一条语句就可以完成添加 shell 命令，可以参考 U_BOOT_CMD 的实现：
+
+```
+#define U_BOOT_CMD(_name, _maxargs, _rep, _cmd, _usage, _help)      \
+    U_BOOT_CMD_COMPLETE(_name, _maxargs, _rep, _cmd, _usage, _help, NULL)
+```
+
+```
+#define U_BOOT_CMD_COMPLETE(_name, _maxargs, _rep, _cmd, _usage, _help, _comp) \
+    ll_entry_declare(cmd_tbl_t, _name, cmd) =           \
+        U_BOOT_CMD_MKENT_COMPLETE(_name, _maxargs, _rep, _cmd,  \
+                        _usage, _help, _comp);
+```
+
+```
+#define ll_entry_declare(_type, _name, _list)               \
+    _type _u_boot_list_2_##_list##_2_##_name __aligned(4)       \
+            __attribute__((unused,              \
+            section(".u_boot_list_2_"#_list"_2_"#_name)))
+```
+
+```
+#define U_BOOT_CMD_MKENT_COMPLETE(_name, _maxargs, _rep, _cmd,      \
+                _usage, _help, _comp)           \
+        { #_name, _maxargs, _rep, _cmd, _usage,         \
+            _CMD_HELP(_help) _CMD_COMPLETE(_comp) }
+```
+
+```
+# define _CMD_HELP(x) x,
+# define _CMD_COMPLETE(x) x,
+```
+
+通过逐层解析宏 `U_BOOT_CMD`，最终会得到：
+
+```
+cmd_tbl_t _u_boot_list_2_cmd_2_boot __aligned(4) __attribute__((unused, section(".u_boot_list_2_cmd_2_boot"))) = {
+        `boot`,
+        1,
+        1,
+        do_bootd,
+        "boot default, i.e., run 'bootcmd'",
+        "",
+        };
+        
+
+```
+
+其中 cmd_tbl_t 定义如下(成员变量 complete 暂不讨论)：
+
+```
+typedef struct cmd_tbl_s    cmd_tbl_t;
+struct cmd_tbl_s {
+    char        *name;      /* Command Name         */
+    int         maxargs;    /* maximum number of arguments  */
+    int         repeatable; /* autorepeat allowed?      */
+                    /* Implementation function  */
+    int         (*cmd)(struct cmd_tbl_s *, int, int, char * const []);
+    char        *usage;     /* Usage message    (short) */
+#ifdef  CONFIG_SYS_LONGHELP
+    char        *help;      /* Help  message    (long)  */
+#endif
+#ifdef CONFIG_AUTO_COMPLETE
+    /* do auto completion on the arguments */
+    int     (*complete)(int argc, char * const argv[], char last_char, int maxv, char *cmdv[]);
+#endif
+};
+```
+
+综上，  `U_BOOT_CMD(...)` 实际上是定义了一个结构体变量，这个结构体定义了 uboot 的 shell 命令要用到的信息，并且这个结构体变量是保存在指定的位置（`section(".u_boot_list_2_cmd_2_boot")`)。 uboot 运行时会主动在该 section 寻找命令并执行。
+
+### 4.2. 找到命令
+
+### 4.3. 执行命令
+
+
+
+
