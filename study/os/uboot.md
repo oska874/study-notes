@@ -187,6 +187,8 @@ cmd_tbl_t _u_boot_list_2_cmd_2_boot __aligned(4) __attribute__((unused, section(
 }
 ```
 
+注：其中 SORT 会按照名称的的顺序进行链接。
+
 cmd_tbl_t 定义如下(成员变量 complete 暂不讨论)：
 
 ```
@@ -227,7 +229,7 @@ static int run_main_loop(void)
 }
 ```
 
-main_loop() 会重复执行，处理输入的命令
+`main_loop()` 会重复执行，处理输入的命令
 
 `common/main.c` 的 main_loop ：
 ```
@@ -263,7 +265,7 @@ void cli_loop(void)
 }                                                                                
 ```
 
-parse_file_outer() 会调用 parse_stream_outer() 解析输入的命令并调用 run_list() 执行命令 :
+`parse_file_outer()` 会调用 `parse_stream_outer()` 解析输入的命令并调用 run_list() 执行命令 :
 
 ```
 static int parse_stream_outer(struct in_str *inp, int flag)
@@ -327,8 +329,90 @@ enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
 }   
 ```
 
-其中 `find_cmd()` 用来在保存命令的 `u_boot_list*` 段内寻找命令对应的结构体变量，然后 cmd_call() 调用结构体变量对应的函数，到此命令执行完成。
+其中 `find_cmd()` 用来在保存命令的 `u_boot_list*` 段内寻找命令对应的结构体变量，然后 `cmd_call()` 调用结构体变量对应的函数，到此命令执行完成。
 
 
+### 4.3. 命令解析
 
+命令解析有三部分：输入命令、找到命令、执行命令。
+
+#### 4.3.1. 输入命令
+
+uboot shell 的命令都是通过串口输入的，s用户输入字符串后会由 uboot 对字符串进行解析，最终获得命令、命令参数。
+
+#### 4.3.2. 找到命令
+
+通过串口输入获取到命令名称和命令参数后，要在 section .u_boot_list_2_cmd_2* 找到命令的结构体变量，根据结构体变量调用命令背后的函数。
+
+寻找命令的函数是 `cmd_tbl_t *find_cmd()` ，函数返回了对应的命令结构体变量 ：
+
+```
+cmd_tbl_t *find_cmd(const char *cmd)
+{
+    cmd_tbl_t *start = ll_entry_start(cmd_tbl_t, cmd);
+    const int len = ll_entry_count(cmd_tbl_t, cmd);
+    return find_cmd_tbl(cmd, start, len);
+}
+```
+
+```
+#define ll_entry_start(_type, _list)                    \
+({                                  \
+    static char start[0] __aligned(4) __attribute__((unused,    \
+        section(".u_boot_list_2_"#_list"_1")));         \
+    (_type *)&start;                        \
+})
+```
+
+```
+#define ll_entry_count(_type, _list)                    \
+    ({                              \
+        _type *start = ll_entry_start(_type, _list);        \
+        _type *end = ll_entry_end(_type, _list);        \
+        unsigned int _ll_result = end - start;          \
+        _ll_result;                     \
+    })
+```
+
+```
+#define ll_entry_end(_type, _list)                  \
+({                                  \
+    static char end[0] __aligned(4) __attribute__((unused,      \
+        section(".u_boot_list_2_"#_list"_3")));         \
+    (_type *)&end;                          \
+})
+```
+
+而命令的结构体变量 `.u_boot_list_2_*_2*` 正好位于 `.u_boot_list_2_"#_list"_1"` 和 `.u_boot_list_2_"#_list"_3"` 之间，这样就获取到了 `.u_boot_list_2_*_2*` 的长度，然后调用函数 `find_cmd_tbl()` 遍历该 section 、寻找命令对应的结构体变量并返回给 shell。
+
+
+```
+cmd_tbl_t *find_cmd_tbl(const char *cmd, cmd_tbl_t *table, int table_len)
+{
+...
+    for (cmdtp = table; cmdtp != table + table_len; cmdtp++) {
+        if (strncmp(cmd, cmdtp->name, len) == 0) {
+            if (len == strlen(cmdtp->name))
+                return cmdtp;   /* full match */
+
+            cmdtp_temp = cmdtp; /* abbreviated command ? */
+            n_found++;
+        }
+    }
+...
+}
+```
+
+#### 4.3.3. 执行命令
+
+cmd_process() 调用 cmd_call() 执行命令，很简单就是直接调用命令结构体变量的成员函数 ： 
+
+```
+static int cmd_call(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+   ...
+    result = (cmdtp->cmd)(cmdtp, flag, argc, argv);
+   ....
+}
+```
 
