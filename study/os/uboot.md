@@ -417,3 +417,62 @@ static int cmd_call(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 }
 ```
 
+## 5. boot os
+
+uboot 主要用来引导 linux ， 一般情况下使用下列命令就可以启动嵌入式 linux ：
+
+```
+echo load ramdisk
+cp.b $ramdisk_addr 2000000 400000
+echo load uImage
+cp.b $kernel_addr 1000000 500000
+echo load dtb
+cp.b $dts_addr 3000000 4000
+echo booting
+bootm 0x1000000 0x2000000 0x3000000
+```
+
+上面的命令通过 `cp` 将 linux 系统的 ramdisk 、 设备树 、 kernel 从 flash 拷贝到内存，然后调用 `bootm` 命令启动系统。
+
+或者，直接输入命令 `boot` 也可以启动系统，而实际上输入 boot 后 uboot 会自动执行上述命令。
+
+### 5.1. 引导系统的命令
+
+和引导系统有关的命令主要有 `boot` 、`bootd` 、`bootm` 、`bootz` 、`bootvx` 、`bootp` `go`，以及加载系统文件的命令 `cp` 、`tftp` 、`fatload` 、`extload` 、`run` 等。
+
+以下是如要的 `boot*` 命令
+
+- `boot` 和 `bootd` 等价，后者是以前的命令名，现在存在的唯一意义就是向后兼容。 `boot` 命令是通过函数 `do_bootd()` 实现的 ： 
+
+  ```
+  int do_bootd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+  {
+      return run_command(getenv("bootcmd"), flag);
+  }
+  ```
+  
+  如代码所示， `boot` 实际上就是运行 shell 变量 bootcmd 所代表的一串命令，比如：
+  
+  ```
+  bootcmd=run findfdt; run init_console; run envboot; run distro_bootcmd
+  ```
+  
+  `boot` 启动系统时只需要在 shell 输入命令本身即可，或者等待 uboot 自己调用 `boot` (uboot 默认会执行 boot 启动 linux)。
+  
+- `bootm` 从内存引导系统，启动系统大多依赖这条命令（以及命令 `go`）， `bootm` 启动 linux 时一般需要三个参数 ： kernel 地址、ramdisk 地址和设备树地址，比如：
+
+  ```
+  bootm $kernel_addr $ramdisk_addr $dtb_addr
+  ```
+- `bootz` 用来启动内存中的 zImage linux 系统镜像。
+
+
+
+
+### 5.2. 引导系统的过程
+
+
+### 5.3. 引导系统的原理
+
+
+
