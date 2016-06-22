@@ -464,12 +464,165 @@ bootm 0x1000000 0x2000000 0x3000000
   ```
   bootm $kernel_addr $ramdisk_addr $dtb_addr
   ```
-- `bootz` 用来启动内存中的 zImage linux 系统镜像。
-
-
-
+- `bootz` 用来启动内存中的 zImage linux 系统镜像。参数于 `bootm` 相同
 
 ### 5.2. 引导系统的过程
+
+1. `boot` 命令本身很简单，其实现依赖于 `bootm`。
+2. `bootm` 和 `bootz` 引导 linux 都主要依赖函数 `do_bootm_states()`。
+
+bootm 的实现：
+
+```
+int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{   
+...    
+    /* determine if we have a sub command */
+    argc--; argv++;
+    if (argc > 0) {
+        char *endp;
+
+        simple_strtoul(argv[0], &endp, 16);
+
+        if ((*endp != 0) && (*endp != ':') && (*endp != '#'))
+            return do_bootm_subcommand(cmdtp, flag, argc, argv);
+    }
+
+    return do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START |
+        BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER |
+        BOOTM_STATE_LOADOS |
+#if defined(CONFIG_PPC) || defined(CONFIG_MIPS)
+        BOOTM_STATE_OS_CMDLINE |
+#endif
+        BOOTM_STATE_OS_PREP | BOOTM_STATE_OS_FAKE_GO |
+        BOOTM_STATE_OS_GO, &images, 1);
+}
+```
+
+bootz 的实现
+
+```
+int do_bootz(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+...
+    if (bootz_start(cmdtp, flag, argc, argv, &images))
+        return 1;
+...
+    images.os.os = IH_OS_LINUX;
+    ret = do_bootm_states(cmdtp, flag, argc, argv,
+                  BOOTM_STATE_OS_PREP | BOOTM_STATE_OS_FAKE_GO |
+                  BOOTM_STATE_OS_GO,
+                  &images, 1);
+...
+}
+```
+
+可以看出 `bootz` 和 `bootm` 要引导系统最终都由 `do_bootm_states()` 完成。 `do_bootm()` 里的 `do_bootm_subcommand()` 只是用来处理一些 `bootm` 的字命令。`do_bootz()` 中的 `bootz_start()` 也只是为最后启动操作系统做一些检查和预备工作。
+
+`do_bootm_subcommand()` 的实现很简单只是执行对应的命令函数，然后标记一下启动的过程。
+
+```
+static int do_bootm_subcommand(cmd_tbl_t *cmdtp, int flag, int argc,
+            char * const argv[])
+{
+    int ret = 0;
+    long state;
+    cmd_tbl_t *c;
+
+    c = find_cmd_tbl(argv[0], &cmd_bootm_sub[0], ARRAY_SIZE(cmd_bootm_sub));
+    argc--; argv++;
+
+    if (c) {
+        state = (long)c->cmd;
+        if (state == BOOTM_STATE_START)
+            state |= BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER;
+    } else {
+        /* Unrecognized command */
+        return CMD_RET_USAGE;
+    }
+
+    if (((state & BOOTM_STATE_START) != BOOTM_STATE_START) &&
+        images.state >= state) {
+        printf("Trying to execute a command out of order\n");
+        return CMD_RET_USAGE;
+    }
+
+    ret = do_bootm_states(cmdtp, flag, argc, argv, state, &images, 0);
+
+    return ret;
+}
+```
+
+`bootz_start()` 会设置好 zImage 的入口，加载 ramdisk 、设备树和其他一下琐碎到内存。
+
+```
+static int bootz_start(cmd_tbl_t *cmdtp, int flag, int argc,
+            char * const argv[], bootm_headers_t *images)
+{
+    int ret;
+    ulong zi_start, zi_end;
+    
+    ret = do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START,
+                  images, 1);
+    
+    /* Setup Linux kernel zImage entry point */
+    if (!argc) {
+        images->ep = load_addr;
+        debug("*  kernel: default image load address = 0x%08lx\n",
+                load_addr);
+    } else {
+        images->ep = simple_strtoul(argv[0], NULL, 16);
+        debug("*  kernel: cmdline image address = 0x%08lx\n",
+            images->ep);
+    }
+    
+    ret = bootz_setup(images->ep, &zi_start, &zi_end);
+    if (ret != 0)
+        return 1;
+    
+    lmb_reserve(&images->lmb, images->ep, zi_end - zi_start);
+    
+    /*
+     * Handle the BOOTM_STATE_FINDOTHER state ourselves as we do not
+     * have a header that provide this informaiton.
+     */
+    if (bootm_find_images(flag, argc, argv))
+        return 1;
+    
+    return 0;
+}
+```
+
+`bootm_find_images()` 加载 ramdisk 和设备树等文件到内存：
+
+```
+int bootm_find_images(int flag, int argc, char * const argv[])
+{
+    int ret;
+    
+    /* find ramdisk */
+    ret = boot_get_ramdisk(argc, argv, &images, IH_INITRD_ARCH,
+                   &images.rd_start, &images.rd_end);
+...
+#if IMAGE_ENABLE_OF_LIBFDT
+    /* find flattened device tree */
+    ret = boot_get_fdt(flag, argc, argv, IH_ARCH_DEFAULT, &images,
+               &images.ft_addr, &images.ft_len);
+    if (ret) { 
+        puts("Could not find a valid device tree\n");
+        return 1;
+    }
+    set_working_fdt_addr((ulong)images.ft_addr);
+#endif
+...
+    return 0;
+}
+```
+
+3. `do_bootm_states()`
+
+
+
 
 
 ### 5.3. 引导系统的原理
