@@ -14,5 +14,13 @@
   - ddr 控制器 ： DDR_CSn_BNDS
   - mmu ： tlb 
   
-3. 外部中断处理
- 需要注意两点：中断号，中断触发方式。后者要配置中断触发高低电平和
+3. 配置外部中断（p1020）
+  配置寄存器 `PIC_EIVPRn` 设置中断优先级和中断触发方式（极性、edge or level sensitive），以及中断向量地址，以及寄存器 `PIC_EIDRn`，设置那个core 可以接收该中断和该中断是否是 critical interrupt 等。
+  
+  配置内部中断类似（配置寄存器 `PIC_IIDRn` 和 `PIC_IIVPRn`），不过不需要设置 edge or level sensitive。
+
+4. processor ID 寄存器 （PIR）
+  PIR 在文档说明是 read-only，但是实际上初始值为 0，每个 core 需要把自己的实际 ID 写到 PIR 寄存器里。如果要获取处理器 ID 最好读取寄存器 PIC_WHOAMI 获取处理器 ID
+
+
+
