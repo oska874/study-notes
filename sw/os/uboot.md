@@ -3,7 +3,7 @@
 ## 1. make 命令
 
   详细命令可以使用 `make help` 或者文件 README 获取：
-  
+
   ```
   ➜  u-boot-2016.05  make help
 Cleaning targets:
@@ -72,7 +72,7 @@ Documentation targets:
 Execute "make" or "make all" to build all targets marked with [*]
 For further info see the ./README file
   ```
-  
+
   其实常用到的命令就 4 个： `make xxx_defconfig` 、 `make clean` 、 `make mrproper` 、 `make -j N`, 注意：
     - 如果不是编译 x86 的 uboot，还需要显式的指出 `ARCH` 和 `CROSS_COMPILE` ， 可以在执行 make 时附带 `ARCH=xxx CROSS_COMPILE=yyy` 编译，也可以设置环境变量（`export ARCH=xxx`)。
     - xxx_defconfig 和你的目标板有关，比如 beaglebone black 的配置文件是 am335x_boneblack_defconfig，具体的配置文件名称可以在目录 `configs`（新版 uboot）或者文件 `boards.cfg` (旧版 uboot） 下找到。
@@ -80,14 +80,16 @@ For further info see the ./README file
 ## 2. make menuconfig
 
   新版的 u-boot 可以像 kernel 一样使用 menuconfig 配置参数（最新版的一定可以）
-  
+
   ```
   make menuconfig
   ```
-  
+
   效果图：
-  
+
+
   ```
+
    .config - U-Boot 2016.05 Configuration
  ──────────────────────────────────────────────────────────────────────────────
   ┌───────────────────── U-Boot 2016.05 Configuration ──────────────────────┐
@@ -106,15 +108,14 @@ For further info see the ./README file
   │        <Select>    < Exit >    < Help >    < Save >    < Load >         │
   └─────────────────────────────────────────────────────────────────────────┘
 
+  ```
 
-  ````
-  
   注意，终端最小得是 80*19 大小。
 
 ## 3. 添加自定义的开发板配置文件
 
   按照 `xxx_defconfig` 这样的名称在 configs 目录下创建文件即可。
-  
+
 ## 4. uboot shell 命令的实现
 
 ### 4.1. 添加命令
@@ -175,7 +176,7 @@ cmd_tbl_t _u_boot_list_2_cmd_2_boot __aligned(4) __attribute__((unused, section(
         "boot default, i.e., run 'bootcmd'",
         "",
         };
-        
+
 
 ```
 
@@ -215,7 +216,7 @@ struct cmd_tbl_s {
 
 ### 4.2. 执行命令
 
-uboot 的 shell 入口是 `common/board_r.c` 的 run_main_loop() : 
+uboot 的 shell 入口是 `common/board_r.c` 的 run_main_loop() :
 
 ```
 static int run_main_loop(void)
@@ -256,14 +257,14 @@ void main_loop(void)
 其中 `cli_loop()` 是执行命令的具体函数 ：
 
 ```
-void cli_loop(void)                                                              
-{                                                                                
-...                                                  
-    parse_file_outer();                                                          
-    /* This point is never reached */                                            
-    for (;;);                                                                    
-...                                              
-}                                                                                
+void cli_loop(void)
+{
+...
+    parse_file_outer();
+    /* This point is never reached */
+    for (;;);
+...
+}
 ```
 
 `parse_file_outer()` 会调用 `parse_stream_outer()` 解析输入的命令并调用 run_list() 执行命令 :
@@ -296,7 +297,7 @@ enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
     cmdtp = find_cmd(argv[0]);
     if (cmdtp == NULL) {
         printf("Unknown command '%s' - try 'help'\n", argv[0]);
-        return 1; 
+        return 1;
     }
 
     /* found - check max args */
@@ -327,7 +328,7 @@ enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
     if (rc == CMD_RET_USAGE)
         rc = cmd_usage(cmdtp);
     return rc;
-}   
+}
 ```
 
 其中 `find_cmd()` 用来在保存命令的 `u_boot_list*` 段内寻找命令对应的结构体变量，然后 `cmd_call()` 调用结构体变量对应的函数，到此命令执行完成。
@@ -406,7 +407,7 @@ cmd_tbl_t *find_cmd_tbl(const char *cmd, cmd_tbl_t *table, int table_len)
 
 #### 4.3.3. 执行命令
 
-cmd_process() 调用 cmd_call() 执行命令，很简单就是直接调用命令结构体变量的成员函数 ： 
+cmd_process() 调用 cmd_call() 执行命令，很简单就是直接调用命令结构体变量的成员函数 ：
 
 ```
 static int cmd_call(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -442,7 +443,7 @@ bootm 0x1000000 0x2000000 0x3000000
 
 以下是如要的 `boot*` 命令
 
-- `boot` 和 `bootd` 等价，后者是以前的命令名，现在存在的唯一意义就是向后兼容。 `boot` 命令是通过函数 `do_bootd()` 实现的 ： 
+- `boot` 和 `bootd` 等价，后者是以前的命令名，现在存在的唯一意义就是向后兼容。 `boot` 命令是通过函数 `do_bootd()` 实现的 ：
 
   ```
   int do_bootd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -450,15 +451,15 @@ bootm 0x1000000 0x2000000 0x3000000
       return run_command(getenv("bootcmd"), flag);
   }
   ```
-  
+
   如代码所示， `boot` 实际上就是运行 shell 变量 bootcmd 所代表的一串命令，比如：
-  
+
   ```
   bootcmd=run findfdt; run init_console; run envboot; run distro_bootcmd
   ```
-  
+
   `boot` 启动系统时只需要在 shell 输入命令本身即可，或者等待 uboot 自己调用 `boot` (uboot 默认会执行 boot 启动 linux)。
-  
+
 - `bootm` 从内存引导系统，启动系统大多依赖这条命令（以及命令 `go`）， `bootm` 启动 linux 时一般需要三个参数 ： kernel 地址、ramdisk 地址和设备树地址，比如：
 
   ```
@@ -471,12 +472,12 @@ bootm 0x1000000 0x2000000 0x3000000
 1. `boot` 命令本身很简单，其实现依赖于 `bootm`。
 2. `bootm` 和 `bootz` 引导 linux 都主要依赖函数 `do_bootm_states()`。
 
-bootm 的实现：
+bootm 的实现(p1020 和 zynq 使用了这种方式)：
 
 ```
 int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{   
-...    
+{
+...
     /* determine if we have a sub command */
     argc--; argv++;
     if (argc > 0) {
@@ -499,7 +500,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 }
 ```
 
-bootz 的实现
+bootz 的实现（beaglebone black 采用了这种方式）：
 
 ```
 int do_bootz(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -561,10 +562,10 @@ static int bootz_start(cmd_tbl_t *cmdtp, int flag, int argc,
 {
     int ret;
     ulong zi_start, zi_end;
-    
+
     ret = do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START,
                   images, 1);
-    
+
     /* Setup Linux kernel zImage entry point */
     if (!argc) {
         images->ep = load_addr;
@@ -575,20 +576,20 @@ static int bootz_start(cmd_tbl_t *cmdtp, int flag, int argc,
         debug("*  kernel: cmdline image address = 0x%08lx\n",
             images->ep);
     }
-    
+
     ret = bootz_setup(images->ep, &zi_start, &zi_end);
     if (ret != 0)
         return 1;
-    
+
     lmb_reserve(&images->lmb, images->ep, zi_end - zi_start);
-    
+
     /*
      * Handle the BOOTM_STATE_FINDOTHER state ourselves as we do not
      * have a header that provide this informaiton.
      */
     if (bootm_find_images(flag, argc, argv))
         return 1;
-    
+
     return 0;
 }
 ```
@@ -599,7 +600,7 @@ static int bootz_start(cmd_tbl_t *cmdtp, int flag, int argc,
 int bootm_find_images(int flag, int argc, char * const argv[])
 {
     int ret;
-    
+
     /* find ramdisk */
     ret = boot_get_ramdisk(argc, argv, &images, IH_INITRD_ARCH,
                    &images.rd_start, &images.rd_end);
@@ -608,7 +609,7 @@ int bootm_find_images(int flag, int argc, char * const argv[])
     /* find flattened device tree */
     ret = boot_get_fdt(flag, argc, argv, IH_ARCH_DEFAULT, &images,
                &images.ft_addr, &images.ft_len);
-    if (ret) { 
+    if (ret) {
         puts("Could not find a valid device tree\n");
         return 1;
     }
@@ -619,13 +620,480 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 }
 ```
 
-3. `do_bootm_states()`
+3. **`do_bootm_states()`**
+
+
+```
+/**
+ * Execute selected states of the bootm command.
+ *
+ * Note the arguments to this state must be the first argument, Any 'bootm'
+ * or sub-command arguments must have already been taken.
+ *
+ * Note that if states contains more than one flag it MUST contain
+ * BOOTM_STATE_START, since this handles and consumes the command line args.
+ *
+ * Also note that aside from boot_os_fn functions and bootm_load_os no other
+ * functions we store the return value of in 'ret' may use a negative return
+ * value, without special handling.
+ *
+ * @param cmdtp     Pointer to bootm command table entry
+ * @param flag      Command flags (CMD_FLAG_...)
+ * @param argc      Number of subcommand arguments (0 = no arguments)
+ * @param argv      Arguments
+ * @param states    Mask containing states to run (BOOTM_STATE_...)
+ * @param images    Image header information
+ * @param boot_progress 1 to show boot progress, 0 to not do this
+ * @return 0 if ok, something else on error. Some errors will cause this
+ *  function to perform a reboot! If states contains BOOTM_STATE_OS_GO
+ *  then the intent is to boot an OS, so this function will not return
+ *  unless the image type is standalone.
+ */
+
+int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
+		    int states, bootm_headers_t *images, int boot_progress)
+{
+	boot_os_fn *boot_fn;
+	ulong iflag = 0;
+	int ret = 0, need_boot_fn;
+
+	images->state |= states;
+
+	/*
+	 * Work through the states and see how far we get. We stop on
+	 * any error.
+	 */
+	if (states & BOOTM_STATE_START)
+		ret = bootm_start(cmdtp, flag, argc, argv);
+
+	if (!ret && (states & BOOTM_STATE_FINDOS))
+		ret = bootm_find_os(cmdtp, flag, argc, argv);
+
+	if (!ret && (states & BOOTM_STATE_FINDOTHER)) {
+		ret = bootm_find_other(cmdtp, flag, argc, argv);
+		argc = 0;	/* consume the args */
+	}
+
+	/* Load the OS */
+	if (!ret && (states & BOOTM_STATE_LOADOS)) {
+		ulong load_end;
+
+		iflag = bootm_disable_interrupts();
+		ret = bootm_load_os(images, &load_end, 0);
+		if (ret == 0)
+			lmb_reserve(&images->lmb, images->os.load,
+				    (load_end - images->os.load));
+		else if (ret && ret != BOOTM_ERR_OVERLAP)
+			goto err;
+		else if (ret == BOOTM_ERR_OVERLAP)
+			ret = 0;
+#if defined(CONFIG_SILENT_CONSOLE) && !defined(CONFIG_SILENT_U_BOOT_ONLY)
+		if (images->os.os == IH_OS_LINUX)
+			fixup_silent_linux();
+#endif
+	}
+
+	/* Relocate the ramdisk */
+#ifdef CONFIG_SYS_BOOT_RAMDISK_HIGH
+	if (!ret && (states & BOOTM_STATE_RAMDISK)) {
+		ulong rd_len = images->rd_end - images->rd_start;
+
+		ret = boot_ramdisk_high(&images->lmb, images->rd_start,
+			rd_len, &images->initrd_start, &images->initrd_end);
+		if (!ret) {
+			setenv_hex("initrd_start", images->initrd_start);
+			setenv_hex("initrd_end", images->initrd_end);
+		}
+	}
+#endif
+#if IMAGE_ENABLE_OF_LIBFDT && defined(CONFIG_LMB)
+	if (!ret && (states & BOOTM_STATE_FDT)) {
+		boot_fdt_add_mem_rsv_regions(&images->lmb, images->ft_addr);
+		ret = boot_relocate_fdt(&images->lmb, &images->ft_addr,
+					&images->ft_len);
+	}
+#endif
+
+	/* From now on, we need the OS boot function */
+	if (ret)
+		return ret;
+	boot_fn = bootm_os_get_boot_func(images->os.os);
+	need_boot_fn = states & (BOOTM_STATE_OS_CMDLINE |
+			BOOTM_STATE_OS_BD_T | BOOTM_STATE_OS_PREP |
+			BOOTM_STATE_OS_FAKE_GO | BOOTM_STATE_OS_GO);
+	if (boot_fn == NULL && need_boot_fn) {
+		if (iflag)
+			enable_interrupts();
+		printf("ERROR: booting os '%s' (%d) is not supported\n",
+		       genimg_get_os_name(images->os.os), images->os.os);
+		bootstage_error(BOOTSTAGE_ID_CHECK_BOOT_OS);
+		return 1;
+	}
+
+	/* Call various other states that are not generally used */
+	if (!ret && (states & BOOTM_STATE_OS_CMDLINE))
+		ret = boot_fn(BOOTM_STATE_OS_CMDLINE, argc, argv, images);
+	if (!ret && (states & BOOTM_STATE_OS_BD_T))
+		ret = boot_fn(BOOTM_STATE_OS_BD_T, argc, argv, images);
+	if (!ret && (states & BOOTM_STATE_OS_PREP))
+		ret = boot_fn(BOOTM_STATE_OS_PREP, argc, argv, images);
+
+#ifdef CONFIG_TRACE
+	/* Pretend to run the OS, then run a user command */
+	if (!ret && (states & BOOTM_STATE_OS_FAKE_GO)) {
+		char *cmd_list = getenv("fakegocmd");
+
+		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_FAKE_GO,
+				images, boot_fn);
+		if (!ret && cmd_list)
+			ret = run_command_list(cmd_list, -1, flag);
+	}
+#endif
+
+	/* Check for unsupported subcommand. */
+	if (ret) {
+		puts("subcommand not supported\n");
+		return ret;
+	}
+
+	/* Now run the OS! We hope this doesn't return */
+	if (!ret && (states & BOOTM_STATE_OS_GO))
+		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_GO,
+				images, boot_fn);
+
+	/* Deal with any fallout */
+err:
+	if (iflag)
+		enable_interrupts();
+
+	if (ret == BOOTM_ERR_UNIMPLEMENTED)
+		bootstage_error(BOOTSTAGE_ID_DECOMP_UNIMPL);
+	else if (ret == BOOTM_ERR_RESET)
+		do_reset(cmdtp, flag, argc, argv);
+
+	return ret;
+}
+```
+
+从注释就可以看出该函数要启动 Linux 需要的参数：启动命令（cmdtp,argv）、linux 镜像头(images)以及启动过程和状态(flag,states,boot_progress)。
+
+states 用来判断引导系统进行到了哪一步，不同阶段有不同的分支代码要执行。如代码中的 `ret = bootm_start(cmdtp, flag, argc, argv);`（设置之后获取到的内核镜像的大小和位置） , `ret = bootm_find_os(cmdtp, flag, argc, argv);`（获取要引导的内核镜像） 等。
+
+分支 `if (!ret && (states & BOOTM_STATE_LOADOS)) { ... }` 会将内核**解压**、**读取**到内存之前设定位置。接下来就是加载 ramdisk 和 设备树。如果上面几步都执行正确，那么接下来就是根据不同的内核类型获取不同系统引导函数:
+
+```
+boot_fn = bootm_os_get_boot_func(images->os.os);
+need_boot_fn = states & (BOOTM_STATE_OS_CMDLINE |
+        BOOTM_STATE_OS_BD_T | BOOTM_STATE_OS_PREP |
+        BOOTM_STATE_OS_FAKE_GO | BOOTM_STATE_OS_GO);
+```
+
+执行系统引导函数时还要根据 states 的内容给 `boot_fn` 传入不同的参数。在最后启动、进入 linux 之前，如果还要进行追踪，可以调用 `getenv()` 和 `run_command_list()` 获取并执行命令（比如执行 fakegocmd 进行追踪）。最后 uboot 执行函数 `boot_selected_os()` 启动操作系统，其实最终调用的还是 `boot_fn()` ，不过传入的参数与之前不同而已。
+
+4. `boot_fn()`
+
+实际启动系统的函数 `boot_fn()` 实际上有一组函数，在 `do_bootm_states()` 中通过 `bootm_os_get_boot_func()` 获取：
+
+```
+boot_fn = bootm_os_get_boot_func(images->os.os);
+```
+
+```
+boot_os_fn *bootm_os_get_boot_func(int os)
+{
+    return boot_os[os];
+}
+
+static boot_os_fn *boot_os[] = {
+    [IH_OS_U_BOOT] = do_bootm_standalone,
+#ifdef CONFIG_BOOTM_LINUX
+    [IH_OS_LINUX] = do_bootm_linux,
+#endif
+#ifdef CONFIG_BOOTM_NETBSD
+    [IH_OS_NETBSD] = do_bootm_netbsd,
+#endif
+#ifdef CONFIG_LYNXKDI
+    [IH_OS_LYNXOS] = do_bootm_lynxkdi,
+#endif
+#ifdef CONFIG_BOOTM_RTEMS
+    [IH_OS_RTEMS] = do_bootm_rtems,
+#endif
+#if defined(CONFIG_BOOTM_OSE)
+    [IH_OS_OSE] = do_bootm_ose,
+#endif
+#if defined(CONFIG_BOOTM_PLAN9)
+    [IH_OS_PLAN9] = do_bootm_plan9,
+#endif
+#if defined(CONFIG_BOOTM_VXWORKS) && \
+    (defined(CONFIG_PPC) || defined(CONFIG_ARM))
+    [IH_OS_VXWORKS] = do_bootm_vxworks,
+#endif
+#if defined(CONFIG_CMD_ELF)
+    [IH_OS_QNX] = do_bootm_qnxelf,
+#endif
+#ifdef CONFIG_INTEGRITY
+    [IH_OS_INTEGRITY] = do_bootm_integrity,
+#endif
+#ifdef CONFIG_BOOTM_OPENRTOS
+    [IH_OS_OPENRTOS] = do_bootm_openrtos,
+#endif
+};
+```
+
+从代码可以看出 uboot 可以支持引导多种操作系统，比如 Linux 、 NetBSD 、 VxWorks 、 OpenRTOS 等。以引导 Linux 的 `do_bootm_linux()` 为例。
+
+`do_bootm_linux()` 是区分架构的，比如 arm 、powerpc 、 mips 、 x86 等。
+
+```
+  1 F   f    do_bootm_linux    arch/arc/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
+  2 F   f    do_bootm_linux    arch/arm/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[],
+  3 F   f    do_bootm_linux    arch/avr32/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *images)
+  4 F   f    do_bootm_linux    arch/blackfin/lib/boot.c
+               int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *images)
+  5 F   f    do_bootm_linux    arch/m68k/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *images)
+  6 F   f    do_bootm_linux    arch/microblaze/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[],
+  7 F   f    do_bootm_linux    arch/mips/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[],
+  8 F   f    do_bootm_linux    arch/nds32/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
+  9 F   f    do_bootm_linux    arch/nios2/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *images)
+ 10 F   f    do_bootm_linux    arch/openrisc/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[],
+ 11 F   f    do_bootm_linux    arch/powerpc/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *images)
+ 12 F   f    do_bootm_linux    arch/sandbox/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
+ 13 F   f    do_bootm_linux    arch/sh/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *images)
+ 14 F   f    do_bootm_linux    arch/sparc/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t * images)
+ 15 F   f    do_bootm_linux    arch/x86/lib/bootm.c
+               int do_bootm_linux(int flag, int argc, char * const argv[],
+```
+
+只看 arm 版的 `do_bootm_linux()` 的代码：
+
+```
+int do_bootm_linux(int flag, int argc, char * const argv[],
+           bootm_headers_t *images)
+{
+    /* No need for those on ARM */
+    if (flag & BOOTM_STATE_OS_BD_T || flag & BOOTM_STATE_OS_CMDLINE)
+        return -1;
+
+    if (flag & BOOTM_STATE_OS_PREP) {
+        boot_prep_linux(images);
+        return 0;
+    }
+
+    if (flag & (BOOTM_STATE_OS_GO | BOOTM_STATE_OS_FAKE_GO)) {
+        boot_jump_linux(images, flag);
+        return 0;
+    }
+
+    boot_prep_linux(images);
+    boot_jump_linux(images, flag);
+    return 0;
+}
+```
+
+```
+static void boot_prep_linux(bootm_headers_t *images)
+{
+    char *commandline = getenv("bootargs");
+
+    if (IMAGE_ENABLE_OF_LIBFDT && images->ft_len) {
+#ifdef CONFIG_OF_LIBFDT
+        debug("using: FDT\n");
+        if (image_setup_linux(images)) {
+            printf("FDT creation failed! hanging...");
+            hang();
+        }
+#endif
+    } else if (BOOTM_ENABLE_TAGS) {
+        debug("using: ATAGS\n");
+        setup_start_tag(gd->bd);
+        if (BOOTM_ENABLE_SERIAL_TAG)
+            setup_serial_tag(&params);
+        if (BOOTM_ENABLE_CMDLINE_TAG)
+            setup_commandline_tag(gd->bd, commandline);
+        if (BOOTM_ENABLE_REVISION_TAG)
+            setup_revision_tag(&params);
+        if (BOOTM_ENABLE_MEMORY_TAGS)
+            setup_memory_tags(gd->bd);
+        if (BOOTM_ENABLE_INITRD_TAG) {
+            /*
+             * In boot_ramdisk_high(), it may relocate ramdisk to
+             * a specified location. And set images->initrd_start &
+             * images->initrd_end to relocated ramdisk's start/end
+             * addresses. So use them instead of images->rd_start &
+             * images->rd_end when possible.
+             */
+            if (images->initrd_start && images->initrd_end) {
+                setup_initrd_tag(gd->bd, images->initrd_start,
+                         images->initrd_end);
+            } else if (images->rd_start && images->rd_end) {
+                setup_initrd_tag(gd->bd, images->rd_start,
+                         images->rd_end);
+            }
+        }
+        setup_board_tags(&params);
+    } else {
+        printf("FDT and ATAGS support not compiled in - hanging\n");
+        hang();
+    }
+}
+```
+
+```
+int image_setup_linux(bootm_headers_t *images)
+{
+    ulong of_size = images->ft_len;
+    char **of_flat_tree = &images->ft_addr;
+    ulong *initrd_start = &images->initrd_start;
+    ulong *initrd_end = &images->initrd_end;
+    struct lmb *lmb = &images->lmb;
+    ulong rd_len;
+    int ret;
+
+    if (IMAGE_ENABLE_OF_LIBFDT)
+        boot_fdt_add_mem_rsv_regions(lmb, *of_flat_tree);
+
+    if (IMAGE_BOOT_GET_CMDLINE) {
+        ret = boot_get_cmdline(lmb, &images->cmdline_start,
+                &images->cmdline_end);
+        if (ret) {
+            puts("ERROR with allocation of cmdline\n");
+            return ret;
+        }
+    }
+    if (IMAGE_ENABLE_RAMDISK_HIGH) {
+        rd_len = images->rd_end - images->rd_start;
+        ret = boot_ramdisk_high(lmb, images->rd_start, rd_len,
+                initrd_start, initrd_end);
+        if (ret)
+            return ret;
+    }
+
+    if (IMAGE_ENABLE_OF_LIBFDT) {
+        ret = boot_relocate_fdt(lmb, of_flat_tree, &of_size);
+        if (ret)
+            return ret;
+    }
+
+    if (IMAGE_ENABLE_OF_LIBFDT && of_size) {
+        ret = image_setup_libfdt(images, *of_flat_tree, of_size, lmb);
+        if (ret)
+            return ret;
+    }
+
+    return 0;
+}
+```
+
+```
+static void boot_jump_linux(bootm_headers_t *images, int flag)
+{
+#ifdef CONFIG_ARM64
+    void (*kernel_entry)(void *fdt_addr, void *res0, void *res1,
+            void *res2);
+    int fake = (flag & BOOTM_STATE_OS_FAKE_GO);
+
+    kernel_entry = (void (*)(void *fdt_addr, void *res0, void *res1,
+                void *res2))images->ep;
+
+    debug("## Transferring control to Linux (at address %lx)...\n",
+        (ulong) kernel_entry);
+    bootstage_mark(BOOTSTAGE_ID_RUN_OS);
+
+    announce_and_cleanup(fake);
+    
+    if (!fake) {
+        do_nonsec_virt_switch();
+        kernel_entry(images->ft_addr, NULL, NULL, NULL);
+    }
+#else
+    unsigned long machid = gd->bd->bi_arch_number;
+    char *s;
+    void (*kernel_entry)(int zero, int arch, uint params);
+    unsigned long r2;
+    int fake = (flag & BOOTM_STATE_OS_FAKE_GO);
+
+    kernel_entry = (void (*)(int, int, uint))images->ep;
+
+    s = getenv("machid");
+    if (s) {
+        if (strict_strtoul(s, 16, &machid) < 0) {
+            debug("strict_strtoul failed!\n");
+            return;
+        }
+        printf("Using machid 0x%lx from environment\n", machid);
+    }
+
+    debug("## Transferring control to Linux (at address %08lx)" \
+        "...\n", (ulong) kernel_entry);
+    bootstage_mark(BOOTSTAGE_ID_RUN_OS);
+    announce_and_cleanup(fake);
+
+    if (IMAGE_ENABLE_OF_LIBFDT && images->ft_len)
+        r2 = (unsigned long)images->ft_addr;
+    else
+        r2 = gd->bd->bi_boot_params;
+
+    if (!fake) {
+#ifdef CONFIG_ARMV7_NONSEC
+        if (armv7_boot_nonsec()) {
+            armv7_init_nonsec();
+            secure_ram_addr(_do_nonsec_entry)(kernel_entry,
+                              0, machid, r2);
+        } else
+#endif
+            kernel_entry(0, machid, r2);
+    }
+#endif
+}
+```
+
+`boot_prep_linux()` 和 `image_setup_linux()` 用来做一些正式启动前的处理工作（**此处待补充**）， `boot_jump_linux()` 用来生成进入系统的入口点（`kernel_entry`），而入口点的信息都是之前函数处理好的，此处只是进行一个跳转而已：
+
+```
+kernel_entry = (void (*)(void *fdt_addr, void *res0, void *res1,
+            void *res2))images->ep;
+...
+if (!fake) {
+    do_nonsec_virt_switch();
+    kernel_entry(images->ft_addr, NULL, NULL, NULL);
+}
+``` 
+
+到此就要进入 linux 了，结束了 uboot 的代码，arm 版的 `boot_fn()` 结束。
+
+5. `kernel_entry` 的实现
+
+在 uboot 中执行了 `kernel_entry()` 就要进入 Linux 了。
+```
+...
+kernel_entry(images->ft_addr, NULL, NULL, NULL);
+...
+```
+
+这在一般的 bootloader 中很常见，对于一般的系统来说，`kernel_entry()` 实际上指向了对应操作系统的入口函数的地址，比如 `main()`，根据需要或许还要传入一些参数，执行 `main()` 时就已经进入到 操作系统的代码了，操作系统接管 CPU 开始了它自己的初始化、配置等工作。
 
 
 
 
 
-### 5.3. 引导系统的原理
+
+
+
+
+
 
 
 
