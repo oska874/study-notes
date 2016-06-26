@@ -12,15 +12,20 @@
   - LAW ： LAW_LAWBAR
   - localbus ： eLBC_ORg
   - ddr 控制器 ： DDR_CSn_BNDS
-  - mmu ： tlb 
-  
+  - mmu ： tlb
+
 3. 配置外部中断（p1020）
   配置寄存器 `PIC_EIVPRn` 设置中断优先级和中断触发方式（极性、edge or level sensitive），以及中断向量地址，以及寄存器 `PIC_EIDRn`，设置那个core 可以接收该中断和该中断是否是 critical interrupt 等。
-  
+
   配置内部中断类似（配置寄存器 `PIC_IIDRn` 和 `PIC_IIVPRn`），不过不需要设置 edge or level sensitive。
 
 4. processor ID 寄存器 （PIR）
   PIR 在文档说明是 read-only，但是实际上初始值为 0，每个 core 需要把自己的实际 ID 写到 PIR 寄存器里。如果要获取处理器 ID 最好读取寄存器 PIC_WHOAMI 获取处理器 ID
+
+5. 双核启动
+  p1020 作为双核处理器有两种启动模式，一种是和其它多核处理器（如arm a9 x2）一样的模式，即 core 0 首先启动，然后由软件唤醒 core 1 （core 2、 core 3 、、、类似），另一种模式是两个 core 同时启动，分别直接从存储介质执行指令。
+
+  大部分情况下都使用第一种模式，根据需要由软件控制 cpu 的启动顺序，这种也是通行方式；第二种方式在一些 rtos 中采用，比如 ucos 2/3 ，做法是两个 core 同时执行一份代码，然后根据所处的 core no 执行不同的代码分支。
 
 
 
