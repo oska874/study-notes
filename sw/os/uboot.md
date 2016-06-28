@@ -1070,13 +1070,14 @@ if (!fake) {
     do_nonsec_virt_switch();
     kernel_entry(images->ft_addr, NULL, NULL, NULL);
 }
-``` 
+```
 
 到此就要进入 linux 了，结束了 uboot 的代码，arm 版的 `boot_fn()` 结束。
 
 5. `kernel_entry` 的实现
 
 在 uboot 中执行了 `kernel_entry()` 就要进入 Linux 了。
+
 ```
 ...
 kernel_entry(images->ft_addr, NULL, NULL, NULL);
@@ -1084,6 +1085,83 @@ kernel_entry(images->ft_addr, NULL, NULL, NULL);
 ```
 
 这在一般的 bootloader 中很常见，对于一般的系统来说，`kernel_entry()` 实际上指向了对应操作系统的入口函数的地址，比如 `main()`，根据需要或许还要传入一些参数，执行 `main()` 时就已经进入到 操作系统的代码了，操作系统接管 CPU 开始了它自己的初始化、配置等工作。
+
+## 5. 驱动框架
+
+1. 声明
+
+  每个设备在 uboot 中都对应一个驱动结构体变量， uboot 操纵外设都是通过该结构体变量实现的。以 ti 的 cpsw 网卡为例，在 `driver/net/cpsw.c` 中定义了多个函数实现了网卡的收发、配置、中断处理等操作，然后通过结构体将这些操作集成到操作结构体 `struct eth_ops` 中：
+  
+  ```
+  static const struct eth_ops cpsw_eth_ops = { 
+    .start      = cpsw_eth_start,
+    .send       = cpsw_eth_send,
+    .recv       = cpsw_eth_recv,
+    .free_pkt   = cpsw_eth_free_pkt,
+    .stop       = cpsw_eth_stop,
+  };
+  ```
+  
+  这个结构体包含了网卡的主要操作：启停、收发等操作，但是这个结构体还是太底层了，不应该直接传给上层应用，也不能传给上层，uboot 的外设驱动架构是把全部的驱动放到一个 **section 群**中，驱动结构体的成员是统一的，cpsw 驱动结构提其组成如下：
+  
+  ```
+  U_BOOT_DRIVER(eth_cpsw) = {
+    .name   = "eth_cpsw",
+    .id = UCLASS_ETH,
+    .of_match = cpsw_eth_ids,
+    .ofdata_to_platdata = cpsw_eth_ofdata_to_platdata,
+    .probe  = cpsw_eth_probe,
+    .ops    = &cpsw_eth_ops,
+    .priv_auto_alloc_size = sizeof(struct cpsw_priv),
+    .platdata_auto_alloc_size = sizeof(struct eth_pdata),
+    .flags = DM_FLAG_ALLOC_PRIV_DMA, 
+  };
+  ```
+  
+  cpsw 驱动的成员包括了驱动名（name）、id、类型（of_match)、探针（probe）、操作（ops）等等。而这些驱动都是保存在同一个 **section 群**中，这是通过宏 `U_BOOT_DRIVER` 实现的：
+  
+  ```
+  /* Declare a new U-Boot driver */
+  #define U_BOOT_DRIVER(__name)                       \
+    ll_entry_declare(struct driver, __name, driver)
+
+  #define ll_entry_declare(_type, _name, _list)               \
+    _type _u_boot_list_2_##_list##_2_##_name __aligned(4)       \
+            __attribute__((unused,              \
+            section(".u_boot_list_2_"#_list"_2_"#_name)))  
+  
+  struct driver {
+    char *name;
+    enum uclass_id id;
+    const struct udevice_id *of_match;
+    int (*bind)(struct udevice *dev);
+    int (*probe)(struct udevice *dev);
+    int (*remove)(struct udevice *dev);
+    int (*unbind)(struct udevice *dev);
+    int (*ofdata_to_platdata)(struct udevice *dev);
+    int (*child_post_bind)(struct udevice *dev);
+    int (*child_pre_probe)(struct udevice *dev);
+    int (*child_post_remove)(struct udevice *dev);
+    int priv_auto_alloc_size;
+    int platdata_auto_alloc_size;
+    int per_child_auto_alloc_size;
+    int per_child_platdata_auto_alloc_size;
+    const void *ops;    /* driver-specific operations */
+    uint32_t flags;
+  };
+  ```
+  
+  这和之前 shell command 的实现类似。此处网卡驱动 `eth_cpsw` 的结构体就是一个定义在段 `.u_boot_list_2_driver_2_eth_cpsw` 的 `struct driver` 结构体（`_u_boot_list_2_driver_2_eth_cpsw`)，定义好网卡驱动之后，其它应用就知道了结构体的名字和位置，从而可以使用该驱动。
+  
+  
+  
+  
+
+  
+  
+                                                      
+
+  
 
 
 
