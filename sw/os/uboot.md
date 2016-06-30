@@ -1152,7 +1152,22 @@ kernel_entry(images->ft_addr, NULL, NULL, NULL);
   ```
   
   这和之前 shell command 的实现类似。此处网卡驱动 `eth_cpsw` 的结构体就是一个定义在段 `.u_boot_list_2_driver_2_eth_cpsw` 的 `struct driver` 结构体（`_u_boot_list_2_driver_2_eth_cpsw`)，定义好网卡驱动之后，其它应用就知道了结构体的名字和位置，从而可以使用该驱动。
+
+2. 调用
+
+  首先注册驱动，将具体设备的驱动和 uboot 的全局结构体（got？）关联起来。
   
+  然后通过全局结构体调用具体的设备驱动。
+  
+  ```
+  int eth_send(void *packet, int length)
+  {
+    ...
+    return eth_current->send(eth_current, packet, length);
+  } 
+  ```
+  
+  uboot 通过 `eth_current->send` 调用了实际网络设备的发送函数。现在要关注的是 eth_current 实际指向的驱动是哪个，以及该变量是何时、何处赋值的。
   
   
   
