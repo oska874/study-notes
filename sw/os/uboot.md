@@ -1649,14 +1649,76 @@ void main_loop(void)
 
 注：不同架构处理器的启动代码逻辑（flash->cache->ddr，这三部分）的处理上还是有一些细节差别的。
 
+### 6.1. 设备的使用
 
+#### 6.1.1. 网卡
 
+如上所示 uboot 启动阶段会执行 `initr_net` 初始化网络：
 
+```
+static int initr_net(void)
+{
+...
+    eth_initialize();
+...
+    return 0;
+}
+```
 
+```
+int eth_initialize(void)
+{
+    int num_devices = 0;
 
+    eth_devices = NULL;
+    eth_current = NULL;
+    eth_common_init();
+    /*
+     * If board-specific initialization exists, call it.
+     * If not, call a CPU-specific one
+     */
+    if (board_eth_init != __def_eth_init) {
+        if (board_eth_init(gd->bd) < 0)
+            printf("Board Net Initialization Failed\n");
+    } else if (cpu_eth_init != __def_eth_init) {
+        if (cpu_eth_init(gd->bd) < 0)
+            printf("CPU Net Initialization Failed\n");
+    } else {
+        printf("Net Initialization Skipped\n");
+    }
+    if (!eth_devices) {
+        puts("No ethernet found.\n");
+        bootstage_error(BOOTSTAGE_ID_NET_ETH_START);
+    } else {
+        ...
+        eth_current = dev;
+        ...
+    }
+    ...
+  }
+```
 
+在函数 `eth_initialize()` 中，会初始化网络地址、参数(`eth_common_init()`)，然后给 `eth_current` 赋值，以后对网卡的操作都会直接调用该变量。如 ping 操作最终会沿着函数调用链 ： `do_ping()`->`net_loop()`->`ping_start()`->`ping_send()`->`arp_request()`->`arp_raw_request()`->->`net_send_packet()`->`eth_send()`->`eth_current->send` 进行发包。
 
+#### 6.1.2. 串口
+uboot 启动阶段会执行 `initr_serial` 初始化串口终端，初始化函数调用链如下：
 
+`initr_serial`->`serial_initialize`->`serial_init`->`serial_find_console_or_panic`
+
+```
+static void serial_find_console_or_panic(void)
+{
+  ...  
+    gd->cur_serial_dev = dev;  
+  ...
+}
+```
+
+以后 uboot 使用串口进行收发包都是调用 `gd->cur_serial_dev` 进行的。
+
+#### 6.1.3. 其他
+
+其他外设大多类似，基本上都是通过 `init_sequence_r[]` 中的初始化函数进行配置的。
 
 
 
