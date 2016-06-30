@@ -1,5 +1,18 @@
 (使用的uboot 版本：`u-boot-2016.07-rc1`)
 
+<!-- MarkdownTOC -->
+
+- 1. make 命令
+- 2. make menuconfig
+- 3. 添加自定义的开发板配置文件
+- 4. uboot shell 命令的实现
+- 5. boot os
+- 5. 驱动框架
+- 6. startup \(armv7\)
+
+<!-- /MarkdownTOC -->
+
+
 ## 1. make 命令
 
   详细命令可以使用 `make help` 或者文件 README 获取：
@@ -1090,6 +1103,8 @@ kernel_entry(images->ft_addr, NULL, NULL, NULL);
 
 1. 声明
 
+- 方式 A
+
   每个设备在 uboot 中都对应一个驱动结构体变量， uboot 操纵外设都是通过该结构体变量实现的。以 ti 的 cpsw 网卡为例，在 `driver/net/cpsw.c` 中定义了多个函数实现了网卡的收发、配置、中断处理等操作，然后通过结构体将这些操作集成到操作结构体 `struct eth_ops` 中：
   
   ```
@@ -1153,6 +1168,42 @@ kernel_entry(images->ft_addr, NULL, NULL, NULL);
   
   这和之前 shell command 的实现类似。此处网卡驱动 `eth_cpsw` 的结构体就是一个定义在段 `.u_boot_list_2_driver_2_eth_cpsw` 的 `struct driver` 结构体（`_u_boot_list_2_driver_2_eth_cpsw`)，定义好网卡驱动之后，其它应用就知道了结构体的名字和位置，从而可以使用该驱动。
 
+- 方式 B
+  
+  方式 B 的驱动声明就相对简单多了 ， 实现网卡的各种操作接口还是必要的 ， 但是此时就不需要再声明定义额外的驱动结构体了，只需要定义一个网卡注册函数 `cpsw_register()` :
+
+```
+  int cpsw_register(struct cpsw_platform_data *data)
+  {
+    struct eth_device   *dev;
+    ...
+    priv->dev = dev;           
+    priv->data = *data;        
+                               
+    strcpy(dev->name, "cpsw"); 
+    dev->iobase = 0;           
+    dev->init   = cpsw_init;   
+    dev->halt   = cpsw_halt;   
+    dev->send   = cpsw_send;   
+    dev->recv   = cpsw_recv;   
+    dev->priv   = priv;        
+                               
+    eth_register(dev);         
+                               
+    ret = _cpsw_register(priv);
+    if (ret < 0) {             
+        eth_unregister(dev);   
+        free(dev);             
+        free(priv);            
+        return ret;            
+    }                          
+                               
+    return 1;                  
+  }
+```
+
+`cpsw_register()` 中会网卡的操作函数 `dev` 关联，并且通过接口 `eth_register()` (uboot 提供的网卡统一注册函数)与全局变量 `eth_register` 关联起来，供上层应用使用。
+
 2. 调用
 
   首先注册驱动，将具体设备的驱动和 uboot 的全局结构体（got？）关联起来。
@@ -1167,18 +1218,20 @@ kernel_entry(images->ft_addr, NULL, NULL, NULL);
   } 
   ```
   
-  uboot 通过 `eth_current->send` 调用了实际网络设备的发送函数。现在要关注的是 eth_current 实际指向的驱动是哪个，以及该变量是何时、何处赋值的。
-  
-  
-  
+  uboot 通过 `eth_current->send` 调用了实际网络设备的发送函数。现在要关注的是 eth_current 实际指向的驱动是哪个，以及该变量是何时、何处赋值的。 (详见 6.1 节)
 
-  
-  
-                                                      
+3. 小结
 
+uboot 的驱动框架相对于 linux driver 来说很简单，但是相对一般裸板系统(以及 RTOS) 来说还是复杂些。
+
+首先，uboot 的驱动实现和裸板系统的驱动类似，都是直接对设备寄存器、存储空间进行操作，所有的功能都要自己实现，不似 linux 已经提供了现成的同步、互斥接口，也不需要考虑内存申请、释放、地址转换等问题，可以说都很原始；
+
+其次，虽然 uboot 的驱动实现很简单，但是使用方法和裸板驱动还是不同的，常见的裸板（包括 RTOS）驱动程序都是直接将底层操作接口暴露给上层应用，而 uboot 却对这些接口进行了封装，针对多平台的外设使用简化了使用复杂度：通过结构体将驱动操作接口和设备的全局变量（比如网卡相关全局变量为 `eth_current`）关联到一起，上层应用只要知道这个全局变量就可以进行设备操作，BSP 工程师要做的就是实现驱动并且在 uboot 初始化外设时将驱动接口和这个全局变量关联起来。
+
+再次，uboot 的驱动还利用了 section 特性，将很多驱动声明在一堆连续的 section 区（如上所述，通过宏 `U_BOOT_DRIVER()` 将驱动结构体放到段 `.u_boot_list_2_driver_2_*`），后续如果要使用这些驱动，则只需要知道驱动名（如网卡 eth_cpsw）。
+
+最后，uboot 的驱动框架是很简单的，既要兼顾多种外设、多种架构，但又要降低驱动的实现难度，提高驱动的执行效率，所以它的框架是针对功能性和复杂度的折中实现。
   
-
-
 ## 6. startup (armv7)
 
 CPU 上电自动进入默认的 reset 中断向量入口，开始执行 uboot 启动汇编(`arch/arm/cpu/armv7/start.S`)
@@ -1742,6 +1795,43 @@ void main_loop(void)
 注：不同架构处理器的启动代码逻辑（flash->cache->ddr，这三部分）的处理上还是有一些细节差别的。
 
 
+
+---
+
+网络驱动注册：
+
+```
+int board_eth_init(bd_t *bis)
+{
+...
+rv = cpsw_register(&cpsw_data);
+...
+}
+```
+
+```
+int cpsw_register(struct cpsw_platform_data *data)
+{       
+
+  eth_register(dev);
+  ...
+}
+```
+
+```
+int eth_register(struct eth_device *dev)
+{
+...
+  eth_devices = dev;
+  eth_current = dev;
+...
+}
+```
+
+serial：
+初始化 serial_initialize -> serial_init -> serial_find_console_or_panic
+
+以 zynq 的串口为例，何处初始化串口？
 
 
 
