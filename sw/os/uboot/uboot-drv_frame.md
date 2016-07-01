@@ -1,9 +1,18 @@
 
 驱动框架
-=========
+========
+<!-- MarkdownTOC -->
+
+- 6. 驱动框架
+  - 6.1. 声明
+  - 6.2. uclasses
+  - 6.3. 调用
+  - 6.4. 设备的使用
+  - 6.5. 小结
+
+<!-- /MarkdownTOC -->
 
 ## 6. 驱动框架
-
 
 ### 6.1. 声明
 
@@ -108,8 +117,9 @@
 
 `cpsw_register()` 中会网卡的操作函数 `dev` 关联，并且通过接口 `eth_register()` (uboot 提供的网卡统一注册函数)与全局变量 `eth_register` 关联起来，供上层应用使用。
 
+### 6.2. uclasses
 
-### 6.2. 调用
+### 6.3. 调用
 
   首先注册驱动，将具体设备的驱动和 uboot 的全局结构体（got？）关联起来。
   
@@ -126,9 +136,9 @@
   uboot 通过 `eth_current->send` 调用了实际网络设备的发送函数。现在要关注的是 eth_current 实际指向的驱动是哪个，以及该变量是何时、何处赋值的。 (详见 6.1 节)
 
 
-### 6.3. 设备的使用
+### 6.4. 设备的使用
 
-#### 6.3.1. 网卡
+#### 6.4.1. 网卡
 
 如上所示 uboot 启动阶段会执行 `initr_net` 初始化网络：
 
@@ -207,7 +217,7 @@ int eth_register(struct eth_device *dev)
 
 以后对网卡的操作都会直接调用 `eth_current`。如 ping 操作最终会沿着函数调用链 ： `do_ping()`->`net_loop()`->`ping_start()`->`ping_send()`->`arp_request()`->`arp_raw_request()`->->`net_send_packet()`->`eth_send()`->`eth_current->send` 进行发包。
 
-#### 6.3.2. 串口
+#### 6.4.2. 串口
 uboot 启动阶段会执行 `initr_serial` 初始化串口终端，初始化函数调用链如下：
 
 `initr_serial`->`serial_initialize`->`serial_init`->`serial_find_console_or_panic`
@@ -216,22 +226,38 @@ uboot 启动阶段会执行 `initr_serial` 初始化串口终端，初始化函�
 static void serial_find_console_or_panic(void)
 {
   ...  
-    gd->cur_serial_dev = dev;  
+    if (!uclass_get_device_by_of_offset(UCLASS_SERIAL, node,
+                    &dev)) {
+      gd->cur_serial_dev = dev;
+    return;
+    }
   ...
+    if (node > 0 &&
+    !lists_bind_fdt(gd->dm_root, blob, node, &dev)) {
+    if (!device_probe(dev)) {
+        gd->cur_serial_dev = dev;
+        return;
+    }
+  ...
+    if (!uclass_get_device_by_seq(UCLASS_SERIAL, INDEX, &dev) ||
+       !uclass_get_device(UCLASS_SERIAL, INDEX, &dev) ||
+       (!uclass_first_device(UCLASS_SERIAL, &dev) && dev)) {
+       gd->cur_serial_dev = dev;
+       return;
+    }
+...    
 }
 ```
 
-以后 uboot 使用串口进行收发包都是调用 `gd->cur_serial_dev` 进行的。
+串口驱动使用了**方式 B** 声明设备结构体，在使用宏 `U_BOOT_DRIVER` 定义设备结构体变量时，会给赋给设备 `.id=UCLASS_SERIAL` ， 然后初始化串口时会调用到 `uclass_add()` ，而这个函数会根据 id 去找设备结构体变量，然后将该设备添加到 `uc->dev_head` 和相关链表链表，并最后把设备指针传给 `gd->cur_serial_dev`。以后 uboot 使用串口进行收发包都是调用 `gd->cur_serial_dev` 进行的。
 
-注：以 zynq 的串口为例，何处初始化串口？
+#### 6.4.3. 其他
 
-#### 6.3.3. 其他
-
-其他外设大多类似，基本上都是通过 `init_sequence_r[]` 中的初始化函数进行配置的。同时驱动自己还需要提供一个接口进行设备注册。
+其他外设大多类似，基本要么使用**方式 A** 通过 `init_sequence_r[]` 中的初始化函数进行配置的，同时驱动自己还需要提供一个接口进行设备注册；或者使用**方式 B** 定义设备结构体，然后由 uboot 根据设备 ID 找到对应的结构体。两种方法最终都是要把设备驱动和 gd 全局变量关联起来。
 
 
 
-### 6.4. 小结
+### 6.5. 小结
 
 uboot 的驱动框架相对于 linux driver 来说很简单，但是相对一般裸板系统(以及 RTOS) 来说还是复杂些。
 
@@ -241,4 +267,11 @@ uboot 的驱动框架相对于 linux driver 来说很简单，但是相对一般
 
 再次，uboot 的驱动还利用了 section 特性，将很多驱动声明在一堆连续的 section 区（如上所述，通过宏 `U_BOOT_DRIVER()` 将驱动结构体放到段 `.u_boot_list_2_driver_2_*`），后续如果要使用这些驱动，则只需要知道驱动名（如网卡 eth_cpsw）。
 
-最后，uboot 的驱动框架是很简单的，既要兼顾多种外设、多种架构，但又要降低驱动的实现难度，提高驱动的执行效率，所以它的框架是针对功能性和复杂度的折中实现。
+最后，uboot 的驱动框架是很简单的，既要兼顾多种外设、多种架构，但又要降低驱动的实现难度，提高驱动的执行效率，所以它的框架是针对功能性和复杂度的折中实现。而 uboot 不同设备驱动在具体实现时采用的框架流程并没有统一，不同类型有不同的执行套路，比较烦人。
+
+
+注：
+
+1. 方式 B 的具体用法还是有疑惑，没有完全搞清楚。
+2. uclass ？
+3. fdt ？
