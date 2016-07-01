@@ -6,13 +6,22 @@
 - 2. make menuconfig
 - 3. 添加自定义的开发板配置文件
 - 4. uboot shell 命令的实现
+  - 4.1. 添加命令
+  - 4.2. 执行命令
+  - 4.3. 命令解析
 - 5. boot os
+  - 5.1. 引导系统的命令
+  - 5.2. 引导系统的过程
 - 5. 驱动框架
-- 6. startup \(armv7\)
+  - 5.1. 声明
+  - 5.2. 调用
+  - 5.3. 设备的使用
+  - 5.4. 小结
+- 6. startup
 
 <!-- /MarkdownTOC -->
 
-
+<a name="None"></a>
 ## 1. make 命令
 
   详细命令可以使用 `make help` 或者文件 README 获取：
@@ -90,6 +99,7 @@ For further info see the ./README file
     - 如果不是编译 x86 的 uboot，还需要显式的指出 `ARCH` 和 `CROSS_COMPILE` ， 可以在执行 make 时附带 `ARCH=xxx CROSS_COMPILE=yyy` 编译，也可以设置环境变量（`export ARCH=xxx`)。
     - xxx_defconfig 和你的目标板有关，比如 beaglebone black 的配置文件是 am335x_boneblack_defconfig，具体的配置文件名称可以在目录 `configs`（新版 uboot）或者文件 `boards.cfg` (旧版 uboot） 下找到。
 
+<a name="None"></a>
 ## 2. make menuconfig
 
   新版的 u-boot 可以像 kernel 一样使用 menuconfig 配置参数（最新版的一定可以）
@@ -125,12 +135,15 @@ For further info see the ./README file
 
   注意，终端最小得是 80*19 大小。
 
+<a name="None"></a>
 ## 3. 添加自定义的开发板配置文件
 
   按照 `xxx_defconfig` 这样的名称在 configs 目录下创建文件即可。
 
+<a name="None"></a>
 ## 4. uboot shell 命令的实现
 
+<a name="None"></a>
 ### 4.1. 添加命令
 
 以命令 `boot` 为例（`cmd/bootm.c`），添加该命令使用了下面的语句：
@@ -227,6 +240,7 @@ struct cmd_tbl_s {
 
 综上，  `U_BOOT_CMD(...)` 实际上是定义了一个结构体变量，这个结构体定义了 uboot 的 shell 命令要用到的信息，并且这个结构体变量是保存在指定的位置（`section(".u_boot_list_2_cmd_2_boot")`)。 uboot 运行时会主动在该 section 寻找命令并执行。
 
+<a name="None"></a>
 ### 4.2. 执行命令
 
 uboot 的 shell 入口是 `common/board_r.c` 的 run_main_loop() :
@@ -347,6 +361,7 @@ enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
 其中 `find_cmd()` 用来在保存命令的 `u_boot_list*` 段内寻找命令对应的结构体变量，然后 `cmd_call()` 调用结构体变量对应的函数，到此命令执行完成。
 
 
+<a name="None"></a>
 ### 4.3. 命令解析
 
 命令解析有三部分：输入命令、找到命令、执行命令。
@@ -431,6 +446,7 @@ static int cmd_call(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 }
 ```
 
+<a name="None"></a>
 ## 5. boot os
 
 uboot 主要用来引导 linux ， 一般情况下使用下列命令就可以启动嵌入式 linux ：
@@ -450,6 +466,7 @@ bootm 0x1000000 0x2000000 0x3000000
 
 或者，直接输入命令 `boot` 也可以启动系统，而实际上输入 boot 后 uboot 会自动执行上述命令。
 
+<a name="None"></a>
 ### 5.1. 引导系统的命令
 
 和引导系统有关的命令主要有 `boot` 、`bootd` 、`bootm` 、`bootz` 、`bootvx` 、`bootp` `go`，以及加载系统文件的命令 `cp` 、`tftp` 、`fatload` 、`extload` 、`run` 等。
@@ -480,6 +497,7 @@ bootm 0x1000000 0x2000000 0x3000000
   ```
 - `bootz` 用来启动内存中的 zImage linux 系统镜像。参数于 `bootm` 相同
 
+<a name="None"></a>
 ### 5.2. 引导系统的过程
 
 1. `boot` 命令本身很简单，其实现依赖于 `bootm`。
@@ -664,127 +682,127 @@ int bootm_find_images(int flag, int argc, char * const argv[])
  */
 
 int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-		    int states, bootm_headers_t *images, int boot_progress)
+        int states, bootm_headers_t *images, int boot_progress)
 {
-	boot_os_fn *boot_fn;
-	ulong iflag = 0;
-	int ret = 0, need_boot_fn;
+  boot_os_fn *boot_fn;
+  ulong iflag = 0;
+  int ret = 0, need_boot_fn;
 
-	images->state |= states;
+  images->state |= states;
 
-	/*
-	 * Work through the states and see how far we get. We stop on
-	 * any error.
-	 */
-	if (states & BOOTM_STATE_START)
-		ret = bootm_start(cmdtp, flag, argc, argv);
+  /*
+   * Work through the states and see how far we get. We stop on
+   * any error.
+   */
+  if (states & BOOTM_STATE_START)
+    ret = bootm_start(cmdtp, flag, argc, argv);
 
-	if (!ret && (states & BOOTM_STATE_FINDOS))
-		ret = bootm_find_os(cmdtp, flag, argc, argv);
+  if (!ret && (states & BOOTM_STATE_FINDOS))
+    ret = bootm_find_os(cmdtp, flag, argc, argv);
 
-	if (!ret && (states & BOOTM_STATE_FINDOTHER)) {
-		ret = bootm_find_other(cmdtp, flag, argc, argv);
-		argc = 0;	/* consume the args */
-	}
+  if (!ret && (states & BOOTM_STATE_FINDOTHER)) {
+    ret = bootm_find_other(cmdtp, flag, argc, argv);
+    argc = 0; /* consume the args */
+  }
 
-	/* Load the OS */
-	if (!ret && (states & BOOTM_STATE_LOADOS)) {
-		ulong load_end;
+  /* Load the OS */
+  if (!ret && (states & BOOTM_STATE_LOADOS)) {
+    ulong load_end;
 
-		iflag = bootm_disable_interrupts();
-		ret = bootm_load_os(images, &load_end, 0);
-		if (ret == 0)
-			lmb_reserve(&images->lmb, images->os.load,
-				    (load_end - images->os.load));
-		else if (ret && ret != BOOTM_ERR_OVERLAP)
-			goto err;
-		else if (ret == BOOTM_ERR_OVERLAP)
-			ret = 0;
+    iflag = bootm_disable_interrupts();
+    ret = bootm_load_os(images, &load_end, 0);
+    if (ret == 0)
+      lmb_reserve(&images->lmb, images->os.load,
+            (load_end - images->os.load));
+    else if (ret && ret != BOOTM_ERR_OVERLAP)
+      goto err;
+    else if (ret == BOOTM_ERR_OVERLAP)
+      ret = 0;
 #if defined(CONFIG_SILENT_CONSOLE) && !defined(CONFIG_SILENT_U_BOOT_ONLY)
-		if (images->os.os == IH_OS_LINUX)
-			fixup_silent_linux();
+    if (images->os.os == IH_OS_LINUX)
+      fixup_silent_linux();
 #endif
-	}
+  }
 
-	/* Relocate the ramdisk */
+  /* Relocate the ramdisk */
 #ifdef CONFIG_SYS_BOOT_RAMDISK_HIGH
-	if (!ret && (states & BOOTM_STATE_RAMDISK)) {
-		ulong rd_len = images->rd_end - images->rd_start;
+  if (!ret && (states & BOOTM_STATE_RAMDISK)) {
+    ulong rd_len = images->rd_end - images->rd_start;
 
-		ret = boot_ramdisk_high(&images->lmb, images->rd_start,
-			rd_len, &images->initrd_start, &images->initrd_end);
-		if (!ret) {
-			setenv_hex("initrd_start", images->initrd_start);
-			setenv_hex("initrd_end", images->initrd_end);
-		}
-	}
+    ret = boot_ramdisk_high(&images->lmb, images->rd_start,
+      rd_len, &images->initrd_start, &images->initrd_end);
+    if (!ret) {
+      setenv_hex("initrd_start", images->initrd_start);
+      setenv_hex("initrd_end", images->initrd_end);
+    }
+  }
 #endif
 #if IMAGE_ENABLE_OF_LIBFDT && defined(CONFIG_LMB)
-	if (!ret && (states & BOOTM_STATE_FDT)) {
-		boot_fdt_add_mem_rsv_regions(&images->lmb, images->ft_addr);
-		ret = boot_relocate_fdt(&images->lmb, &images->ft_addr,
-					&images->ft_len);
-	}
+  if (!ret && (states & BOOTM_STATE_FDT)) {
+    boot_fdt_add_mem_rsv_regions(&images->lmb, images->ft_addr);
+    ret = boot_relocate_fdt(&images->lmb, &images->ft_addr,
+          &images->ft_len);
+  }
 #endif
 
-	/* From now on, we need the OS boot function */
-	if (ret)
-		return ret;
-	boot_fn = bootm_os_get_boot_func(images->os.os);
-	need_boot_fn = states & (BOOTM_STATE_OS_CMDLINE |
-			BOOTM_STATE_OS_BD_T | BOOTM_STATE_OS_PREP |
-			BOOTM_STATE_OS_FAKE_GO | BOOTM_STATE_OS_GO);
-	if (boot_fn == NULL && need_boot_fn) {
-		if (iflag)
-			enable_interrupts();
-		printf("ERROR: booting os '%s' (%d) is not supported\n",
-		       genimg_get_os_name(images->os.os), images->os.os);
-		bootstage_error(BOOTSTAGE_ID_CHECK_BOOT_OS);
-		return 1;
-	}
+  /* From now on, we need the OS boot function */
+  if (ret)
+    return ret;
+  boot_fn = bootm_os_get_boot_func(images->os.os);
+  need_boot_fn = states & (BOOTM_STATE_OS_CMDLINE |
+      BOOTM_STATE_OS_BD_T | BOOTM_STATE_OS_PREP |
+      BOOTM_STATE_OS_FAKE_GO | BOOTM_STATE_OS_GO);
+  if (boot_fn == NULL && need_boot_fn) {
+    if (iflag)
+      enable_interrupts();
+    printf("ERROR: booting os '%s' (%d) is not supported\n",
+           genimg_get_os_name(images->os.os), images->os.os);
+    bootstage_error(BOOTSTAGE_ID_CHECK_BOOT_OS);
+    return 1;
+  }
 
-	/* Call various other states that are not generally used */
-	if (!ret && (states & BOOTM_STATE_OS_CMDLINE))
-		ret = boot_fn(BOOTM_STATE_OS_CMDLINE, argc, argv, images);
-	if (!ret && (states & BOOTM_STATE_OS_BD_T))
-		ret = boot_fn(BOOTM_STATE_OS_BD_T, argc, argv, images);
-	if (!ret && (states & BOOTM_STATE_OS_PREP))
-		ret = boot_fn(BOOTM_STATE_OS_PREP, argc, argv, images);
+  /* Call various other states that are not generally used */
+  if (!ret && (states & BOOTM_STATE_OS_CMDLINE))
+    ret = boot_fn(BOOTM_STATE_OS_CMDLINE, argc, argv, images);
+  if (!ret && (states & BOOTM_STATE_OS_BD_T))
+    ret = boot_fn(BOOTM_STATE_OS_BD_T, argc, argv, images);
+  if (!ret && (states & BOOTM_STATE_OS_PREP))
+    ret = boot_fn(BOOTM_STATE_OS_PREP, argc, argv, images);
 
 #ifdef CONFIG_TRACE
-	/* Pretend to run the OS, then run a user command */
-	if (!ret && (states & BOOTM_STATE_OS_FAKE_GO)) {
-		char *cmd_list = getenv("fakegocmd");
+  /* Pretend to run the OS, then run a user command */
+  if (!ret && (states & BOOTM_STATE_OS_FAKE_GO)) {
+    char *cmd_list = getenv("fakegocmd");
 
-		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_FAKE_GO,
-				images, boot_fn);
-		if (!ret && cmd_list)
-			ret = run_command_list(cmd_list, -1, flag);
-	}
+    ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_FAKE_GO,
+        images, boot_fn);
+    if (!ret && cmd_list)
+      ret = run_command_list(cmd_list, -1, flag);
+  }
 #endif
 
-	/* Check for unsupported subcommand. */
-	if (ret) {
-		puts("subcommand not supported\n");
-		return ret;
-	}
+  /* Check for unsupported subcommand. */
+  if (ret) {
+    puts("subcommand not supported\n");
+    return ret;
+  }
 
-	/* Now run the OS! We hope this doesn't return */
-	if (!ret && (states & BOOTM_STATE_OS_GO))
-		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_GO,
-				images, boot_fn);
+  /* Now run the OS! We hope this doesn't return */
+  if (!ret && (states & BOOTM_STATE_OS_GO))
+    ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_GO,
+        images, boot_fn);
 
-	/* Deal with any fallout */
+  /* Deal with any fallout */
 err:
-	if (iflag)
-		enable_interrupts();
+  if (iflag)
+    enable_interrupts();
 
-	if (ret == BOOTM_ERR_UNIMPLEMENTED)
-		bootstage_error(BOOTSTAGE_ID_DECOMP_UNIMPL);
-	else if (ret == BOOTM_ERR_RESET)
-		do_reset(cmdtp, flag, argc, argv);
+  if (ret == BOOTM_ERR_UNIMPLEMENTED)
+    bootstage_error(BOOTSTAGE_ID_DECOMP_UNIMPL);
+  else if (ret == BOOTM_ERR_RESET)
+    do_reset(cmdtp, flag, argc, argv);
 
-	return ret;
+  return ret;
 }
 ```
 
@@ -1099,9 +1117,11 @@ kernel_entry(images->ft_addr, NULL, NULL, NULL);
 
 这在一般的 bootloader 中很常见，对于一般的系统来说，`kernel_entry()` 实际上指向了对应操作系统的入口函数的地址，比如 `main()`，根据需要或许还要传入一些参数，执行 `main()` 时就已经进入到 操作系统的代码了，操作系统接管 CPU 开始了它自己的初始化、配置等工作。
 
+<a name="None"></a>
 ## 5. 驱动框架
 
-1. 声明
+<a name="None"></a>
+### 5.1. 声明
 
 - 方式 A
 
@@ -1204,7 +1224,8 @@ kernel_entry(images->ft_addr, NULL, NULL, NULL);
 
 `cpsw_register()` 中会网卡的操作函数 `dev` 关联，并且通过接口 `eth_register()` (uboot 提供的网卡统一注册函数)与全局变量 `eth_register` 关联起来，供上层应用使用。
 
-2. 调用
+<a name="None"></a>
+### 5.2. 调用
 
   首先注册驱动，将具体设备的驱动和 uboot 的全局结构体（got？）关联起来。
   
@@ -1220,7 +1241,113 @@ kernel_entry(images->ft_addr, NULL, NULL, NULL);
   
   uboot 通过 `eth_current->send` 调用了实际网络设备的发送函数。现在要关注的是 eth_current 实际指向的驱动是哪个，以及该变量是何时、何处赋值的。 (详见 6.1 节)
 
-3. 小结
+<a name="None"></a>
+### 5.3. 设备的使用
+
+#### 5.3.1. 网卡
+
+如上所示 uboot 启动阶段会执行 `initr_net` 初始化网络：
+
+```
+static int initr_net(void)
+{
+...
+    eth_initialize();
+...
+    return 0;
+}
+```
+
+```
+int eth_initialize(void)
+{
+    int num_devices = 0;
+
+    eth_devices = NULL;
+    eth_current = NULL;
+    eth_common_init();
+    /*
+     * If board-specific initialization exists, call it.
+     * If not, call a CPU-specific one
+     */
+    if (board_eth_init != __def_eth_init) {
+        if (board_eth_init(gd->bd) < 0)
+            printf("Board Net Initialization Failed\n");
+    } else if (cpu_eth_init != __def_eth_init) {
+        if (cpu_eth_init(gd->bd) < 0)
+            printf("CPU Net Initialization Failed\n");
+    } else {
+        printf("Net Initialization Skipped\n");
+    }
+    if (!eth_devices) {
+        puts("No ethernet found.\n");
+        bootstage_error(BOOTSTAGE_ID_NET_ETH_START);
+    } else {
+        ...
+        eth_current = dev;
+        ...
+    }
+    ...
+  }
+```
+
+在函数 `eth_initialize()` 中，会初始化网络地址、参数(`eth_common_init()`)，接着进入 `board_eth_init()` 注册网络设备，并给 `eth_current` 赋值。
+
+```
+int board_eth_init(bd_t *bis)
+{
+...
+rv = cpsw_register(&cpsw_data);
+...
+}
+```
+
+```
+int cpsw_register(struct cpsw_platform_data *data)
+{       
+
+  eth_register(dev);
+  ...
+}
+```
+
+```
+int eth_register(struct eth_device *dev)
+{
+...
+  eth_devices = dev;
+  eth_current = dev;
+...
+}
+```
+
+以后对网卡的操作都会直接调用 `eth_current`。如 ping 操作最终会沿着函数调用链 ： `do_ping()`->`net_loop()`->`ping_start()`->`ping_send()`->`arp_request()`->`arp_raw_request()`->->`net_send_packet()`->`eth_send()`->`eth_current->send` 进行发包。
+
+#### 5.3.2. 串口
+uboot 启动阶段会执行 `initr_serial` 初始化串口终端，初始化函数调用链如下：
+
+`initr_serial`->`serial_initialize`->`serial_init`->`serial_find_console_or_panic`
+
+```
+static void serial_find_console_or_panic(void)
+{
+  ...  
+    gd->cur_serial_dev = dev;  
+  ...
+}
+```
+
+以后 uboot 使用串口进行收发包都是调用 `gd->cur_serial_dev` 进行的。
+
+注：以 zynq 的串口为例，何处初始化串口？
+
+#### 5.3.3. 其他
+
+其他外设大多类似，基本上都是通过 `init_sequence_r[]` 中的初始化函数进行配置的。同时驱动自己还需要提供一个接口进行设备注册。
+
+
+<a name="None"></a>
+### 5.4. 小结
 
 uboot 的驱动框架相对于 linux driver 来说很简单，但是相对一般裸板系统(以及 RTOS) 来说还是复杂些。
 
@@ -1232,7 +1359,10 @@ uboot 的驱动框架相对于 linux driver 来说很简单，但是相对一般
 
 最后，uboot 的驱动框架是很简单的，既要兼顾多种外设、多种架构，但又要降低驱动的实现难度，提高驱动的执行效率，所以它的框架是针对功能性和复杂度的折中实现。
   
-## 6. startup (armv7)
+<a name="None"></a>
+## 6. startup 
+
+1. armv7
 
 CPU 上电自动进入默认的 reset 中断向量入口，开始执行 uboot 启动汇编(`arch/arm/cpu/armv7/start.S`)
 
@@ -1794,111 +1924,7 @@ void main_loop(void)
 
 注：不同架构处理器的启动代码逻辑（flash->cache->ddr，这三部分）的处理上还是有一些细节差别的。
 
-### 6.1. 设备的使用
 
-#### 6.1.1. 网卡
-
-如上所示 uboot 启动阶段会执行 `initr_net` 初始化网络：
-
-```
-static int initr_net(void)
-{
-...
-    eth_initialize();
-...
-    return 0;
-}
-```
-
-
-
-
-```
-int eth_initialize(void)
-{
-    int num_devices = 0;
-
-    eth_devices = NULL;
-    eth_current = NULL;
-    eth_common_init();
-    /*
-     * If board-specific initialization exists, call it.
-     * If not, call a CPU-specific one
-     */
-    if (board_eth_init != __def_eth_init) {
-        if (board_eth_init(gd->bd) < 0)
-            printf("Board Net Initialization Failed\n");
-    } else if (cpu_eth_init != __def_eth_init) {
-        if (cpu_eth_init(gd->bd) < 0)
-            printf("CPU Net Initialization Failed\n");
-    } else {
-        printf("Net Initialization Skipped\n");
-    }
-    if (!eth_devices) {
-        puts("No ethernet found.\n");
-        bootstage_error(BOOTSTAGE_ID_NET_ETH_START);
-    } else {
-        ...
-        eth_current = dev;
-        ...
-    }
-    ...
-  }
-```
-
-在函数 `eth_initialize()` 中，会初始化网络地址、参数(`eth_common_init()`)，接着进入 `board_eth_init()` 注册网络设备，并给 `eth_current` 赋值。
-
-```
-int board_eth_init(bd_t *bis)
-{
-...
-rv = cpsw_register(&cpsw_data);
-...
-}
-```
-
-```
-int cpsw_register(struct cpsw_platform_data *data)
-{       
-
-  eth_register(dev);
-  ...
-}
-```
-
-```
-int eth_register(struct eth_device *dev)
-{
-...
-  eth_devices = dev;
-  eth_current = dev;
-...
-}
-```
-
-以后对网卡的操作都会直接调用 `eth_current`。如 ping 操作最终会沿着函数调用链 ： `do_ping()`->`net_loop()`->`ping_start()`->`ping_send()`->`arp_request()`->`arp_raw_request()`->->`net_send_packet()`->`eth_send()`->`eth_current->send` 进行发包。
-
-#### 6.1.2. 串口
-uboot 启动阶段会执行 `initr_serial` 初始化串口终端，初始化函数调用链如下：
-
-`initr_serial`->`serial_initialize`->`serial_init`->`serial_find_console_or_panic`
-
-```
-static void serial_find_console_or_panic(void)
-{
-  ...  
-    gd->cur_serial_dev = dev;  
-  ...
-}
-```
-
-以后 uboot 使用串口进行收发包都是调用 `gd->cur_serial_dev` 进行的。
-
-注：以 zynq 的串口为例，何处初始化串口？
-
-#### 6.1.3. 其他
-
-其他外设大多类似，基本上都是通过 `init_sequence_r[]` 中的初始化函数进行配置的。同时驱动自己还需要提供一个接口进行设备注册。
 
 
 
