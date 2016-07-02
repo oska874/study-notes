@@ -4,11 +4,13 @@
 <!-- MarkdownTOC -->
 
 - 6. 驱动框架
+  - 6.1. 声明
+  - 6.2. uclass
+  - 6.3. 调用
+  - 6.4. 设备的使用
+  - 6.5. 小结
 
 <!-- /MarkdownTOC -->
-
-
-
 
 ## 6. 驱动框架
 
@@ -115,13 +117,13 @@
 
 `cpsw_register()` 中会网卡的操作函数 `dev` 关联，并且通过接口 `eth_register()` (uboot 提供的网卡统一注册函数)与全局变量 `eth_register` 关联起来，供上层应用使用。
 
-### 6.2. uclasses
+### 6.2. uclass
 
 uclass 是一组操作方式相似的设备。一个 uclass 提供了一种在一组设备中操作一个设备的方法，而且使用的是一组相同的接口。
 
-以 uboot 自带的 uclasses demo 为例（`cmd/demo.c`）。
+以 uboot 自带的 uclass demo 为例（`cmd/demo.c`）。
 
-uclasses 的核心结构体是 `udevice` ：
+uclass 的主要的数据结构是 `udevice` ：
 
 ```
 struct udevice {
@@ -149,6 +151,149 @@ struct udevice {
 };
 ```
 
+和 `uclass_driver` :
+
+```
+struct uclass_driver {                          
+    const char *name;                           
+    enum uclass_id id;                          
+    int (*post_bind)(struct udevice *dev);      
+    int (*pre_unbind)(struct udevice *dev);     
+    int (*pre_probe)(struct udevice *dev);      
+    int (*post_probe)(struct udevice *dev);     
+    int (*pre_remove)(struct udevice *dev);     
+    int (*child_post_bind)(struct udevice *dev);
+    int (*child_pre_probe)(struct udevice *dev);
+    int (*init)(struct uclass *class);          
+    int (*destroy)(struct uclass *class);       
+    int priv_auto_alloc_size;                   
+    int per_device_auto_alloc_size;             
+    int per_device_platdata_auto_alloc_size;    
+    int per_child_auto_alloc_size;              
+    int per_child_platdata_auto_alloc_size;     
+    const void *ops;                            
+    uint32_t flags;                             
+};                                              
+```
+
+而 `U_BOOT_DRIVER` 定义的驱动也是属于 uclass 驱动。
+
+`demo.c` 中定义了一个结构体变量 `struct udevice *demo_dev` ， `do_demo()` 实现了命令 `demo` ：
+
+```
+static int do_demo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{                                                                            
+    ...
+        ret = uclass_get_device(UCLASS_DEMO, devnum, &demo_dev);             
+    ...                    
+}
+
+```
+
+`uclass_get_device()` 完成两件事：
+
+```
+int uclass_get_device(enum uclass_id id, int index, struct udevice **devp)
+{                                                                         
+...                                                  
+    ret = uclass_find_device(id, index, &dev);                            
+    return uclass_get_device_tail(dev, ret, devp);                        
+} 
+```
+
+1. 从 uclass 驱动所在的 section 找到找到 uclass driver 
+
+uboot 已经在 `demo_uclass.c` 定义了 demo 的 uclass 驱动结构体：
+
+```
+UCLASS_DRIVER(demo) = {   
+    .name       = "demo", 
+    .id     = UCLASS_DEMO,
+};
+```
+
+do_demo() 要做的就是找到这个结构体变量：
+
+```
+int uclass_find_device(enum uclass_id id, int index, struct udevice **devp)
+{                                                                          
+ ...                                          
+    ret = uclass_get(id, &uc);                                             
+ ...
+    list_for_each_entry(dev, &uc->dev_head, uclass_node) {                 
+        if (!index--) {                                                    
+            *devp = dev;                                                   
+            return 0;                                                      
+        }                                                                  
+    }                                                                      
+ ...                                                      
+}                                                                          
+```
+
+首先根据 uclass id 和设备 id 找到一组 uclass 设备驱动并且从中找到具体的某个设备。而 uclass id 就是上面的 `UCLASS_DEMO` ，而设备 id 则是在具体设备定义的驱动中，比如 demo hello 驱动的定义 ：
+
+```
+static const struct udevice_id demo_shape_id[] = {
+    { "demo-simple", 0 },
+    { },
+};
+
+U_BOOT_DRIVER(demo_simple_drv) = {
+    .name   = "demo_simple_drv",
+    .of_match = demo_shape_id,
+    .id = UCLASS_DEMO,
+    .ofdata_to_platdata = demo_shape_ofdata_to_platdata,
+    .ops    = &simple_ops,
+    .platdata_auto_alloc_size = sizeof(struct dm_demo_pdata),
+};
+```
+
+设备 id 就是该设备在 `demo_shape_id` 的下标。
+
+
+2. 找到具体的设备之后就是初始化该设备。
+
+```
+int uclass_get_device_tail(struct udevice *dev, int ret,
+                  struct udevice **devp)                
+{                                                       
+...                                       
+    ret = device_probe(dev);                            
+...                                          
+}                                                       
+```
+
+找到找到设备驱动并进行初始化之后，就该执行设备提供的功能，比如 demo 提供的 hello 功能：
+
+```
+=> demo hello 0
+r@@@@@@@
+e@@@@@@@
+d@@@@@@@
+r@@@@@@@
+e@@@@@@@
+d@@@@@@@
+```
+
+这个功能的实现依赖于函数 `demo_hello()` :
+
+```
+int demo_hello(struct udevice *dev, int ch)
+{
+    const struct demo_ops *ops = device_get_ops(dev);
+
+    if (!ops->hello) 
+        return -ENOSYS;
+    
+    return ops->hello(dev, ch);
+}
+```
+
+其中参数 `dev` 就是上面的 `demo_dev`，以后的操作只需要调用结构体对应的操作函数即可。
+
+#### 6.2.1. uclass 的内部结构
+
+方式 B 驱动实现方式本质上就是 uclass 。简单来说， uclass 机制就是将外设分为多组，每组不同的设备都有一个相同的 ID （如上面的 UCLASS_DEMO），然后 uboot 在声明驱动时将所有的驱动按顺序连续保存在一起，运行时如果要使用某个设备就需要根据 ID 找到对应组的驱动，然后根据设备 ID 找到具体某个设备的驱动，后面使用设备就是执行这个驱动对应的操作函数。
 
 
 ### 6.3. 调用
