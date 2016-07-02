@@ -3,8 +3,7 @@
 <!-- MarkdownTOC -->
 
 - 1. make 命令
-- 2. make menuconfig
-- 3. 添加自定义的开发板配置文件
+- 2. 添加自定义的开发板配置文件
 
 <!-- /MarkdownTOC -->
 
@@ -85,7 +84,7 @@ For further info see the ./README file
     - 如果不是编译 x86 的 uboot，还需要显式的指出 `ARCH` 和 `CROSS_COMPILE` ， 可以在执行 make 时附带 `ARCH=xxx CROSS_COMPILE=yyy` 编译，也可以设置环境变量（`export ARCH=xxx`)。
     - xxx_defconfig 和你的目标板有关，比如 beaglebone black 的配置文件是 am335x_boneblack_defconfig，具体的配置文件名称可以在目录 `configs`（新版 uboot）或者文件 `boards.cfg` (旧版 uboot） 下找到。
 
-## 2. make menuconfig
+### 1.1. make menuconfig
 
   新版的 u-boot 可以像 kernel 一样使用 menuconfig 配置参数（最新版的一定可以）
 
@@ -119,6 +118,85 @@ For further info see the ./README file
 
   注意，终端最小得是 80*19 大小。
 
-## 3. 添加自定义的开发板配置文件
+### 1.2. sandbox 镜像
+
+如果没有合适的运行环境（开发板）运行 uboot 镜像，可以编译 sandbox 版的 uboot ， 这样就可以想运行程序一样运行 uboot 镜像 ：
+
+```
+make sandbox_defconfig
+make
+./u-boot -d u-boot.dtb
+
+(type 'reset' to exit U-Boot)
+
+```
+
+启动后和普通的 uboot 一样 ：
+
+```
+➜  u-boot-2016.07-rc2 ./u-boot -d u-boot.dtb
+
+
+U-Boot 2016.07-rc2 (Jul 02 2016 - 11:11:15 +0800)
+
+DRAM:  128 MiB
+MMC:   
+Using default environment
+
+In:    cros-ec-keyb
+Out:   vidconsole
+Err:   vidconsole
+SCSI:  Net:   eth0: eth@10002000, eth1: eth@80000000, eth5: eth@90000000
+IDE:   Bus 0: not available  
+=> 
+```
+
+注意编译 sandbox 版的 uboot 需要主机支持 sdl ，ubuntu 下 `sudo apt-get install libsdl1.2-dev` 即可。
+
+#### 1.2.1. test
+
+执行脚本 `./test/py/test.py --bd sandbox --build -k ut_dm -v` 可以测试 driver model 。
+
+注意： 1. 测试程序依赖 python 2.7 和 pytest ，需要手动安装；
+2. 执行时要保证 uboot 没有被编译过（可以用 `make mrproer` 清理一下），否则会报错。
+
+执行结果：
+
+```
+➜  u-boot-2016.07-rc2 ./test/py/test.py --bd sandbox --build -k ut_dm -v
++make O=/workspace/repos/src/u-boot-2016.07-rc2/build-sandbox -s sandbox_defconfig
++make O=/workspace/repos/src/u-boot-2016.07-rc2/build-sandbox -s -j8
+In file included from tools/common/image-fit.c:1:
+../tools/../common/image-fit.c:1691:39: warning: use of logical '||' with constant operand [-Wconstant-logical-operand]
+        os_ok = image_type == IH_TYPE_FLATDT || IH_TYPE_FPGA ||
+                                             ^  ~~~~~~~~~~~~
+../tools/../common/image-fit.c:1691:39: note: use '|' for a bitwise operation
+        os_ok = image_type == IH_TYPE_FLATDT || IH_TYPE_FPGA ||
+                                             ^~
+                                             |
+1 warning generated.
+===================== WARNING ======================
+This board uses CONFIG_DM_I2C_COMPAT. Please remove
+(possibly in a subsequent patch in your series)
+before sending patches to the mailing list.
+====================================================
+===================================================================== test session starts =====================================================================
+platform linux2 -- Python 2.7.11+, pytest-2.9.2, py-1.4.31, pluggy-0.3.1 -- /usr/bin/python
+cachedir: .cache
+rootdir: /workspace/repos/src/u-boot-2016.07-rc2, inifile: 
+collected 206 items 
+
+test/py/tests/test_ut.py::test_ut_dm_init PASSED
+test/py/tests/test_ut.py::test_ut[ut_dm_adc_bind] PASSED
+test/py/tests/test_ut.py::test_ut[ut_dm_adc_multi_channel_conversion] PASSED
+test/py/tests/test_ut.py::test_ut[ut_dm_adc_multi_channel_shot] PASSED
+test/py/tests/test_ut.py::test_ut[ut_dm_adc_single_channel_conversion] PASSED
+test/py/tests/test_ut.py::test_ut[ut_dm_adc_single_channel_shot] PASSED
+...
+```
+
+（**test 实现后续补充，可以借鉴到一般的嵌入式软件开发测试**）
+
+## 2. 添加自定义的开发板配置文件
 
   按照 `xxx_defconfig` 这样的名称在 configs 目录下创建文件即可。

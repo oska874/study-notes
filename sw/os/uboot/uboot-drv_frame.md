@@ -4,13 +4,11 @@
 <!-- MarkdownTOC -->
 
 - 6. 驱动框架
-  - 6.1. 声明
-  - 6.2. uclasses
-  - 6.3. 调用
-  - 6.4. 设备的使用
-  - 6.5. 小结
 
 <!-- /MarkdownTOC -->
+
+
+
 
 ## 6. 驱动框架
 
@@ -118,6 +116,40 @@
 `cpsw_register()` 中会网卡的操作函数 `dev` 关联，并且通过接口 `eth_register()` (uboot 提供的网卡统一注册函数)与全局变量 `eth_register` 关联起来，供上层应用使用。
 
 ### 6.2. uclasses
+
+uclass 是一组操作方式相似的设备。一个 uclass 提供了一种在一组设备中操作一个设备的方法，而且使用的是一组相同的接口。
+
+以 uboot 自带的 uclasses demo 为例（`cmd/demo.c`）。
+
+uclasses 的核心结构体是 `udevice` ：
+
+```
+struct udevice {
+    const struct driver *driver;
+    const char *name;
+    void *platdata;
+    void *parent_platdata;
+    void *uclass_platdata;
+    int of_offset;
+    ulong driver_data;
+    struct udevice *parent;
+    void *priv;
+    struct uclass *uclass;
+    void *uclass_priv;
+    void *parent_priv;
+    struct list_head uclass_node;
+    struct list_head child_head;
+    struct list_head sibling_node;
+    uint32_t flags;
+    int req_seq;
+    int seq;
+#ifdef CONFIG_DEVRES
+    struct list_head devres_head;
+#endif
+};
+```
+
+
 
 ### 6.3. 调用
 
@@ -275,3 +307,4 @@ uboot 的驱动框架相对于 linux driver 来说很简单，但是相对一般
 1. 方式 B 的具体用法还是有疑惑，没有完全搞清楚。
 2. uclass ？
 3. fdt ？
+4. 不全面，需要继续补充
