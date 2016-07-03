@@ -8,7 +8,8 @@
   - 6.2. uclass
   - 6.3. 调用
   - 6.4. 设备的使用
-  - 6.5. 小结
+  - 6.5. 设备树
+  - 6.6. 小结
 
 <!-- /MarkdownTOC -->
 
@@ -394,6 +395,8 @@ int eth_register(struct eth_device *dev)
 
 以后对网卡的操作都会直接调用 `eth_current`。如 ping 操作最终会沿着函数调用链 ： `do_ping()`->`net_loop()`->`ping_start()`->`ping_send()`->`arp_request()`->`arp_raw_request()`->->`net_send_packet()`->`eth_send()`->`eth_current->send` 进行发包。
 
+注： 网卡的接口主要是收发，以及一些配置或特殊功能，现在都是通过U_BOOT_DRIVER 进行封装的，协议栈（net/net.c）会主动调用网卡接口。
+
 #### 6.4.2. 串口
 uboot 启动阶段会执行 `initr_serial` 初始化串口终端，初始化函数调用链如下：
 
@@ -432,9 +435,12 @@ static void serial_find_console_or_panic(void)
 
 其他外设大多类似，基本要么使用**方式 A** 通过 `init_sequence_r[]` 中的初始化函数进行配置的，同时驱动自己还需要提供一个接口进行设备注册；或者使用**方式 B** 定义设备结构体，然后由 uboot 根据设备 ID 找到对应的结构体。两种方法最终都是要把设备驱动和 gd 全局变量关联起来。
 
+### 6.5. 设备树
 
+dts，fdt
+(待补充)
 
-### 6.5. 小结
+### 6.6. 小结
 
 uboot 的驱动框架相对于 linux driver 来说很简单，但是相对一般裸板系统(以及 RTOS) 来说还是复杂些。
 
@@ -447,9 +453,3 @@ uboot 的驱动框架相对于 linux driver 来说很简单，但是相对一般
 最后，uboot 的驱动框架是很简单的，既要兼顾多种外设、多种架构，但又要降低驱动的实现难度，提高驱动的执行效率，所以它的框架是针对功能性和复杂度的折中实现。而 uboot 不同设备驱动在具体实现时采用的框架流程并没有统一，不同类型有不同的执行套路，比较烦人。
 
 
-注：
-
-1. 方式 B 的具体用法还是有疑惑，没有完全搞清楚。
-2. uclass ？
-3. fdt ？
-4. 不全面，需要继续补充
