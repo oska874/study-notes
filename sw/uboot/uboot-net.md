@@ -6,9 +6,10 @@
 
 - 7. net
     - 7.1. 协议栈主循环
-    - 7.2. ping
-    - 7.3. tftp
-    - 7.4. 小结
+    - 7.2. 协议栈和驱动
+    - 7.3. ping
+    - 7.4. tftp
+    - 7.5. 小结
 
 <!-- /MarkdownTOC -->
 
@@ -293,7 +294,54 @@ net_cleanup_loop();
 ...
 ```
 
-### 7.2. ping
+### 7.2. 协议栈和驱动
+
+协议栈收发数据都是通过函数 `eth_send()` 和 `eth_rx()` 完成的。
+
+发包：
+
+```
+int eth_send(void *packet, int length)                         
+{                                                              
+...                                   
+    current = eth_get_dev();                                   
+...
+    ret = eth_get_ops(current)->send(current, packet, length); 
+    if (ret < 0) {                                             
+        /* We cannot completely return the error at present */ 
+        debug("%s: send() returned error %d\n", __func__, ret);
+    }                                                          
+    return ret;                                                
+}                                                              
+
+```
+
+收包：
+
+```
+int eth_rx(void)
+{
+...
+    current = eth_get_dev();
+...  
+    for (i = 0; i < 32; i++) {
+        ret = eth_get_ops(current)->recv(current, flags, &packet);
+        flags = 0;
+        if (ret > 0)
+            net_process_received_packet(packet, ret);
+        if (ret >= 0 && eth_get_ops(current)->free_pkt)
+            eth_get_ops(current)->free_pkt(current, packet, ret);
+        if (ret <= 0)
+            break;
+    }
+...
+    return ret;
+}
+```
+
+两者最终都是调用实际的驱动函数 `cpsw_send()` 和 `cpsw_recv()` 进行收发包
+
+### 7.3. ping
 
 uboot 网络支持多种操作，但是都有一个特点就是必须 uboot 首先发起操作，然后相应对端的操作，并不能像一般的系统那样时时刻刻接受对端的网络请求。
 
@@ -346,7 +394,7 @@ static int ping_send(void)
 }
 ```
 
-`arp_request()` 最终会执行 `eth_tx()` 调用网卡驱动发送数据包。
+`arp_request()` 最终会执行 `eth_send()` 调用网卡驱动发送数据包。
 
 接下来，`net_loop()` 会等待对端发送的响应包，并进行处理：
 
@@ -382,7 +430,7 @@ void ping_receive(struct ethernet_hdr *et, struct ip_udp_hdr *ip, int len)
 
 通过函数 `net_set_state()` 告知 `net_loop()` ping 操作成功，否则 ping 失败，即网络有问题。
 
-### 7.3. tftp
+### 7.4. tftp
 
 tftp 分两部分：向服务器发送请求和从服务器接收数据，所以在 `net_loop()` 中 tftp 协议有两组判断条件：
 
@@ -420,7 +468,7 @@ void tftp_start(enum proto_t protocol)
 接下来 `net_loop()` 会循环调用 `eth_rx()` 接收数据包，直到所有数据都收完（钩子函数 `udp_packet_handler` 会不断的检查已收到的文件长度和实际文件长度是否一直）。
 
 
-### 7.4. 小结
+### 7.5. 小结
 
 uboot 的网络协议栈可以说是麻雀虽小肝胆俱全，网络协议栈所需要的功能它基本都实现了，比如 ping 、 tftp 、tftp server 、DHCP 、 bootp 、 arp/rarp 、DNS 等，它主要侧重于功能的实现，对实时性、并发性等要求不高，所以都是由用户输入命令主动发起操作，并且是单线程操作。
 
