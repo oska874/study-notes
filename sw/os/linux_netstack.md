@@ -283,13 +283,15 @@ PACKET_LOOPBACK         |5       |MC/BRD 的 loopback 帧（用户层不可见�
 
 销毁 `kfree_skb()`
 
+**分包/组包** ： 
+
 ##### (skb 待补充)
 
 ### 2.2. sockfs 初始化
 
 网络通信可以被看作对文件的操作，socket 也是一种文件。网络初始化首先就要初始化 网络文件系统（sockfs）。
 
-第一步是初始化 inode 缓冲(`init_inodecache`)，为 sockfs 的inode 分配一片高速缓存 ：
+第一步是初始化 inode 缓冲(`init_inodecache`)，为 sockfs 的 inode 分配一片高速缓存 ：
 
 ```
 static int init_inodecache(void)
