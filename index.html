@@ -1,38 +1,36 @@
 ---
-layout: default
+layout: page
 ---
-<div class="col-md-9 col-content">
-    {% for post in paginator.posts %}
-      {% include posts.html%}
+
+{% for post in site.posts limit:10 %}
+  <h2 class="post-title">
+    <a href="{{post.url | prepend:site.baseurl | prepend:site.url}}">
+      {{ post.title }}
+    </a>
+  </h3>
+
+  <div class="post-meta">
+  <div class="post-time">
+    <i class="fa fa-calendar"></i>
+    <time>{{ post.date | date_to_string }}</time>
+  </div>
+  <ul>
+    {% for tag in post.tags %}
+    <li><a href="{{site.baseurl | prepend:site.url}}/tag/{{ tag }}">{{ tag }}</a></li>
     {% endfor %}
-    <nav>
-        <ul class="pagination pagination-posts">
-          {% if paginator.total_pages > 1 %}
-              {% if paginator.previous_page %}
-                <li>
-                  <a href="{{ paginator.previous_page_path | prepend: site.url}}" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a>
-                </li>
-              {% endif %}
-              {% for page in (1..paginator.total_pages) %}
-                  {% if page == paginator.page %}
-                    <li class="active"><span>{{ page }}</span></li>
-                  {% elsif page == 1 %}
-                    <li><a href="{{ site.url }}">{{ page }}</a></li>
-                  {% else %}
-                    <li><a href="{{ site.baseurl | prepend: site.url }}/page{{ page }}">{{ page }}</a></li>
-                  {% endif %}
-                  {% endfor %}
-              {% if !paginator.next_page %}
-                  <li>
-                    <a href="{{ paginator.next_page_path | prepend: site.baseurl | prepend: site.url}}" aria-label="Next"><span aria-hidden="true">&raquo;</span></a>
-                  </li>
-              {% endif %}
-            {% endif %}
-        </ul>
-    </nav>
+  </ul>
 </div>
-<div class="col-md-3 col-sidebar">
-    {% include sidebar_author.html%}
-    {% include sidebar_categories.html%}
-    {% include sidebar_tags.html%}
+
+  <div class="post-descr">
+    <p>
+      {{ post.description }}
+    </p>
+  </div>
+  {% endfor %}
+
+
+<div class="post-footer">
+  <div class="column-full">
+    <h3><a href="{{ '/archive.html' | prepend: site.baseurl | prepend: site.url }}">Blog archive</a></h3>
+  </div>
 </div>
