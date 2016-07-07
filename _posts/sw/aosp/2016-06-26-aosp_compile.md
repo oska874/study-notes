@@ -1,3 +1,10 @@
+---
+tags : android
+---
+
+AOSP 开发流程
+============
+
 (in progress)
 
 ## 1. get aosp
