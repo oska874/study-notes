@@ -1,0 +1,44 @@
+---
+layout: default
+---
+<div class="container">
+    <div class="col-md-9 col-content">
+        <div id="post-content" class="panel panel-pithy post">
+            <div class="panel-heading">
+                <h3 class="title">
+                  <i class="fa fa-bookmark-o"></i>{{page.title}}
+                </h3>
+                <ul class="info">
+                    <li>
+                      {{ 'post.author' | translate }} <span class="author">{{ page.author }}</span>
+                    </li>
+                    <li>
+                      {{ 'post.update_date' | translate }} {{ page.date | date: "%Y年%m月%d日" }}
+                    </li>
+                    <li>
+                      {{ 'post.tags' | translate }}
+                     {% for tag in page.tags %}
+                         <a class="tag" href="{{site.baseurl}}/tag/#{{ tag }}">{{ tag }}</a>
+                     {% endfor %}
+                    </li>
+                </ul>
+            </div>
+            <div class="panel-body content">
+                {{content}}
+            </div>
+            {% if site.duoshuo_share.enable%}
+              {% include share.html%}
+            {% endif %}
+        </div>
+        <!--
+            if config set comment enable,include comment
+        -->
+        {% if site.comment.enable %}
+            {% include comment.html%}
+        {% endif %}
+    </div>
+    <div class="col-md-3 col-sidebar">
+        {% include sidebar_categories.html%}
+        {% include sidebar_tags.html%}
+    </div>
+</div>
