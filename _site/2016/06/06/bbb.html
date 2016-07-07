@@ -1,0 +1,5 @@
+<ol>
+  <li>ARM 使用设备前要使能其 clock ，否则会报错。
+  每个设备都属于一个 clock domain / power domain，启动阶段需要使能要使用的设备的 domain ，否则无法访问该设备。而 powerpc 则没有这种要求，只要配置好了 bank 、地址，就可以正常访问。</li>
+</ol>
+
