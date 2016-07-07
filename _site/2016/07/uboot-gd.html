@@ -1,0 +1,342 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Blog Name</title>
+  <meta name="theme-color" content="#222222" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
+  <script src="/js/header.js"></script>
+  <script src="/js/toc.js"></script>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/theme.css" rel="stylesheet">
+  <link href="/css/syntax.css" rel="stylesheet">
+  <link href="/css/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+  
+
+  
+
+
+ <script type="text/javascript">
+  WebFontConfig = {
+    google: {
+      families: ['Ubuntu::latin']
+    }
+  };
+  (function() {
+    var wf = document.createElement('script');
+    wf.src = ('https:' == document.location.protocol ? 'https' : 'http') +
+      '://ajax.googleapis.com/ajax/libs/webfont/1/webfont.js';
+    wf.type = 'text/javascript';
+    wf.async = 'true';
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(wf, s);
+  })();
+</script>
+
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">Blog Name</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li><a href="/">/home</a></li>
+          <li><a href="/archive.html">/archive</a></li>
+          <li><a href="/tags.html">/tags</a></li>
+          <li><a href="/about.html">/about</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+
+<div class="wrapper">
+  <div class="content">
+    <div class="container container-center">
+      <div class="row">
+        <div class="col-md-8">
+          <div class="article">
+            <div class="well">
+              <h1><a href="/2016/07/uboot-gd">Uboot Gd</a></h1>
+              <div class="post-meta">
+                <div class="post-time">
+                  <i class="fa fa-calendar"></i>
+                  <time>02 Jul 2016</time>
+                </div>
+                <ul>
+                  
+                </ul>
+              </div>
+              <div class="post-content">
+                <div id="toc" class="toc"></div>
+                
+<h1 id="gd">gd</h1>
+
+<h2 id="gd-1">8. gd</h2>
+
+<p>gd 是一个 <code class="highlighter-rouge">gd_t</code> 类型的结构体变量，在 uboot 阶段地址保存在寄存器 <code class="highlighter-rouge">r9</code>:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#define DECLARE_GLOBAL_DATA_PTR     register volatile gd_t *gd asm ("r9")
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">gd_t</code> 结构体定义在 <code class="highlighter-rouge">include/asm-generic/global_data.h</code> ：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>typedef struct global_data {
+    bd_t *bd;
+    unsigned long flags;
+    unsigned int baudrate;
+    unsigned long cpu_clk;  /* CPU clock in Hz!     */
+    unsigned long bus_clk;
+    /* We cannot bracket this with CONFIG_PCI due to mpc5xxx */
+    unsigned long pci_clk;
+    unsigned long mem_clk;
+#if defined(CONFIG_LCD) || defined(CONFIG_VIDEO)
+    unsigned long fb_base;  /* Base address of framebuffer mem */
+#endif
+#if defined(CONFIG_POST) || defined(CONFIG_LOGBUFFER)
+    unsigned long post_log_word;  /* Record POST activities */
+    unsigned long post_log_res; /* success of POST test */
+    unsigned long post_init_f_time;  /* When post_init_f started */
+#endif
+#ifdef CONFIG_BOARD_TYPES
+    unsigned long board_type;
+#endif
+    unsigned long have_console; /* serial_init() was called */
+#ifdef CONFIG_PRE_CONSOLE_BUFFER
+    unsigned long precon_buf_idx;   /* Pre-Console buffer index */
+#endif
+    unsigned long env_addr; /* Address  of Environment struct */
+    unsigned long env_valid;    /* Checksum of Environment valid? */
+        unsigned long env_valid;    /* Checksum of Environment valid? */
+
+    unsigned long ram_top;  /* Top address of RAM used by U-Boot */
+
+    unsigned long relocaddr;    /* Start address of U-Boot in RAM */
+    phys_size_t ram_size;   /* RAM size */
+#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#define MEM_RESERVE_SECURE_SECURED  0x1
+#define MEM_RESERVE_SECURE_MAINTAINED   0x2
+#define MEM_RESERVE_SECURE_ADDR_MASK    (~0x3)
+    /*
+     * Secure memory addr
+     * This variable needs maintenance if the RAM base is not zero,
+     * or if RAM splits into non-consecutive banks. It also has a
+     * flag indicating the secure memory is marked as secure by MMU.
+     * Flags used: 0x1 secured
+     *             0x2 maintained
+     */
+    phys_addr_t secure_ram;
+#endif
+    unsigned long mon_len;  /* monitor len */
+    unsigned long irq_sp;       /* irq stack pointer */
+    unsigned long start_addr_sp;    /* start_addr_stackpointer */
+    unsigned long reloc_off;
+    struct global_data *new_gd; /* relocated global data */
+
+#ifdef CONFIG_DM
+    struct udevice  *dm_root;   /* Root instance for Driver Model */
+    struct udevice  *dm_root_f; /* Pre-relocation root instance */
+    struct list_head uclass_root;   /* Head of core tree */
+#endif
+#ifdef CONFIG_TIMER
+    struct udevice  *timer; /* Timer instance for Driver Model */
+#endif
+
+    const void *fdt_blob;   /* Our device tree, NULL if none */
+    void *new_fdt;      /* Relocated FDT */
+    unsigned long fdt_size; /* Space reserved for relocated FDT */
+    struct jt_funcs *jt;        /* jump table */
+    char env_buf[32];   /* buffer for getenv() before reloc. */
+#ifdef CONFIG_TRACE
+    void        *trace_buff;    /* The trace buffer */
+#endif
+#if defined(CONFIG_SYS_I2C)
+    int     cur_i2c_bus;    /* current used i2c bus */
+#endif
+#ifdef CONFIG_SYS_I2C_MXC
+    void *srdata[10];
+#endif
+    unsigned long timebase_h;
+        unsigned long timebase_l;
+#ifdef CONFIG_SYS_MALLOC_F_LEN
+    unsigned long malloc_base;  /* base address of early malloc() */
+    unsigned long malloc_limit; /* limit address */
+    unsigned long malloc_ptr;   /* current address */
+#endif
+#ifdef CONFIG_PCI
+    struct pci_controller *hose;    /* PCI hose for early use */
+    phys_addr_t pci_ram_top;    /* top of region accessible to PCI */
+#endif
+#ifdef CONFIG_PCI_BOOTDELAY
+    int pcidelay_done;
+#endif
+    struct udevice *cur_serial_dev; /* current serial device */
+    struct arch_global_data arch;   /* architecture-specific data */
+#ifdef CONFIG_CONSOLE_RECORD
+    struct membuff console_out; /* console output */
+    struct membuff console_in;  /* console input */
+#endif
+#ifdef CONFIG_DM_VIDEO
+    ulong video_top;        /* Top of video frame buffer area */
+    ulong video_bottom;     /* Bottom of video frame buffer area */
+#endif
+} gd_t;
+</code></pre>
+</div>
+
+<p>从定义可以看出 gd 实际上包含了 uboot 运行过程中要使用的几乎全部的全局变量。</p>
+
+<p>gd 最开始是在 <code class="highlighter-rouge">_main</code> 里初始化的(有些架构是在 <code class="highlighter-rouge">board_init_f()</code> 里面初始化的):</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>ENTRY(_main)
+...
+/* set up gd here, outside any C code */
+mov r9, r0
+bl  board_init_f_init_reserve
+...
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>void board_init_f_init_reserve(ulong base)
+{
+    struct global_data *gd_ptr;
+#ifndef _USE_MEMCPY
+    int *ptr;
+#endif
+
+    /*
+     * clear GD entirely and set it up.
+     * Use gd_ptr, as gd may not be properly set yet.
+     */
+
+    gd_ptr = (struct global_data *)base;
+    /* zero the area */
+#ifdef _USE_MEMCPY
+    memset(gd_ptr, '\0', sizeof(*gd));
+#else
+    for (ptr = (int *)gd_ptr; ptr &lt; (int *)(gd_ptr + 1); )
+        *ptr++ = 0;
+#endif
+    /* set GD unless architecture did it already */
+#if !defined(CONFIG_ARM)
+    arch_setup_gd(gd_ptr);
+#endif
+    /* next alloc will be higher by one GD plus 16-byte alignment */
+    base += roundup(sizeof(struct global_data), 16);
+
+    /*
+     * record early malloc arena start.
+     * Use gd as it is now properly set for all architectures.
+     */
+
+#if defined(CONFIG_SYS_MALLOC_F)
+    /* go down one 'early malloc arena' */
+    gd-&gt;malloc_base = base;
+    /* next alloc will be higher by one 'early malloc arena' size */
+    base += CONFIG_SYS_MALLOC_F_LEN;
+#endif
+}
+</code></pre>
+</div>
+
+<p>并且随着 uboot 初始化外设、准备引导系统的过程不断的初始化自己的各个成员变量，如初始化串口时就对 <code class="highlighter-rouge">*cur_serial_dev</code> 进行赋值。</p>
+
+                
+
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 hidden-xs">
+          <div class="sidebar ">
+  <h2>Recent Posts</h2>
+  <ul>
+    
+    <li><a href="/2016/07/kernel_initcall">Kernel_initcall</a></li>
+    
+    <li><a href="/2016/07/linux_netstack">Linux_netstack</a></li>
+    
+    <li><a href="/2016/07/kernel_init">Kernel_init</a></li>
+    
+    <li><a href="/2016/07/intercept_syscall">Intercept_syscall</a></li>
+    
+    <li><a href="/2016/07/uboot-net">Uboot Net</a></li>
+    
+  </ul>
+</div>
+
+<div class="sidebar">
+  <h2>Tags</h2>
+  <ul>
+    
+  </ul>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+
+  </div>
+      <footer class="footer-distributed">
+      <div class="container">
+        <div class="footer">
+          <p>Pavel Makhov &copy; 2015</p>
+          <h6>Follow me</h6>
+
+<ul class="social-media">
+
+  
+    <li>
+      <a title="streetturtle on Github" href="https://github.com/streetturtle" target="_blank"><i class="fa fa-github fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on StackOverflow" href="http://stackoverflow.com/users/" target="_blank"><i class="fa fa-stack-overflow fa-2x"></i></a>
+    </li>
+  
+
+  
+
+  
+    <li>
+      <a title=" on Instagram" href="https://instagram.com/" target="_blank"><i class="fa fa-instagram fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on Last.fm" href="http://lastfm.com/user/" target="_blank"><i class="fa fa-lastfm fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title="feed.xml RSS" href="/feed.xml" target="_blank"><i class="fa fa-rss fa-2x"></i></a>
+    </li>
+  
+
+</ul>
+
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+</div>

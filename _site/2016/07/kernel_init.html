@@ -1,0 +1,219 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Blog Name</title>
+  <meta name="theme-color" content="#222222" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
+  <script src="/js/header.js"></script>
+  <script src="/js/toc.js"></script>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/theme.css" rel="stylesheet">
+  <link href="/css/syntax.css" rel="stylesheet">
+  <link href="/css/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+  
+
+  
+
+
+ <script type="text/javascript">
+  WebFontConfig = {
+    google: {
+      families: ['Ubuntu::latin']
+    }
+  };
+  (function() {
+    var wf = document.createElement('script');
+    wf.src = ('https:' == document.location.protocol ? 'https' : 'http') +
+      '://ajax.googleapis.com/ajax/libs/webfont/1/webfont.js';
+    wf.type = 'text/javascript';
+    wf.async = 'true';
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(wf, s);
+  })();
+</script>
+
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">Blog Name</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li><a href="/">/home</a></li>
+          <li><a href="/archive.html">/archive</a></li>
+          <li><a href="/tags.html">/tags</a></li>
+          <li><a href="/about.html">/about</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+
+<div class="wrapper">
+  <div class="content">
+    <div class="container container-center">
+      <div class="row">
+        <div class="col-md-8">
+          <div class="article">
+            <div class="well">
+              <h1><a href="/2016/07/kernel_init">Kernel_init</a></h1>
+              <div class="post-meta">
+                <div class="post-time">
+                  <i class="fa fa-calendar"></i>
+                  <time>05 Jul 2016</time>
+                </div>
+                <ul>
+                  
+                </ul>
+              </div>
+              <div class="post-content">
+                <div id="toc" class="toc"></div>
+                
+<p>内核启动后从汇编进入 <code class="highlighter-rouge">start_kernel()</code> ，然后会调用 <code class="highlighter-rouge">rest_init()</code> ，该函数会创建一个内核进程运行 <code class="highlighter-rouge">kernel_init()</code> :</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>static noinline void __init_refok rest_init(void)
+{
+...
+    /*
+     * We need to spawn init first so that it obtains pid 1, however
+     * the init task will end up wanting to create kthreads, which, if
+     * we schedule it before we create kthreadd, will OOPS.
+     */
+    kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
+...
+}
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">kernel_thread()</code> 的原型是 ` pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);` ，创建一个内核线程。</p>
+
+<p><code class="highlighter-rouge">kernel_init()</code> 会创建 <code class="highlighter-rouge">init</code> 内核线程执行 init 任务：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>static int __ref kernel_init(void *unused)
+{
+    ...
+    if (ramdisk_execute_command) {
+        if (!run_init_process(ramdisk_execute_command))
+            return 0;
+        pr_err("Failed to execute %s\n", ramdisk_execute_command);
+    }
+    if (execute_command) {
+        if (!run_init_process(execute_command))
+            return 0;
+        pr_err("Failed to execute %s.  Attempting defaults...\n", execute_command);
+    }
+    if (!run_init_process("/sbin/init") ||
+        !run_init_process("/etc/init") ||
+        !run_init_process("/bin/init") ||
+        !run_init_process("/bin/sh"))
+        return 0;
+
+    panic("No init found.  Try passing init= option to kernel. "
+          "See Linux Documentation/init.txt for guidance.");
+}
+</code></pre>
+</div>
+
+<p>内核会根据实际情况、顺序选择执行 <code class="highlighter-rouge">ramdisk_execute_command</code> 、 <code class="highlighter-rouge">execute_command</code> 、 <code class="highlighter-rouge">/sbin/init</code> 、 <code class="highlighter-rouge">/etc/init</code> 、 <code class="highlighter-rouge">/bin/init</code> 、 <code class="highlighter-rouge">/bin/sh</code>，只要一个执行成功就会返回成功，否则进入 <code class="highlighter-rouge">panic()</code>。</p>
+
+<p>（未完待续）</p>
+
+                
+
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 hidden-xs">
+          <div class="sidebar ">
+  <h2>Recent Posts</h2>
+  <ul>
+    
+    <li><a href="/2016/07/kernel_initcall">Kernel_initcall</a></li>
+    
+    <li><a href="/2016/07/linux_netstack">Linux_netstack</a></li>
+    
+    <li><a href="/2016/07/kernel_init">Kernel_init</a></li>
+    
+    <li><a href="/2016/07/intercept_syscall">Intercept_syscall</a></li>
+    
+    <li><a href="/2016/07/uboot-net">Uboot Net</a></li>
+    
+  </ul>
+</div>
+
+<div class="sidebar">
+  <h2>Tags</h2>
+  <ul>
+    
+  </ul>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+
+  </div>
+      <footer class="footer-distributed">
+      <div class="container">
+        <div class="footer">
+          <p>Pavel Makhov &copy; 2015</p>
+          <h6>Follow me</h6>
+
+<ul class="social-media">
+
+  
+    <li>
+      <a title="streetturtle on Github" href="https://github.com/streetturtle" target="_blank"><i class="fa fa-github fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on StackOverflow" href="http://stackoverflow.com/users/" target="_blank"><i class="fa fa-stack-overflow fa-2x"></i></a>
+    </li>
+  
+
+  
+
+  
+    <li>
+      <a title=" on Instagram" href="https://instagram.com/" target="_blank"><i class="fa fa-instagram fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on Last.fm" href="http://lastfm.com/user/" target="_blank"><i class="fa fa-lastfm fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title="feed.xml RSS" href="/feed.xml" target="_blank"><i class="fa fa-rss fa-2x"></i></a>
+    </li>
+  
+
+</ul>
+
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+</div>

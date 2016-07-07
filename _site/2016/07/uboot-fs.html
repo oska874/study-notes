@@ -1,0 +1,373 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Blog Name</title>
+  <meta name="theme-color" content="#222222" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
+  <script src="/js/header.js"></script>
+  <script src="/js/toc.js"></script>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/theme.css" rel="stylesheet">
+  <link href="/css/syntax.css" rel="stylesheet">
+  <link href="/css/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+  
+
+  
+
+
+ <script type="text/javascript">
+  WebFontConfig = {
+    google: {
+      families: ['Ubuntu::latin']
+    }
+  };
+  (function() {
+    var wf = document.createElement('script');
+    wf.src = ('https:' == document.location.protocol ? 'https' : 'http') +
+      '://ajax.googleapis.com/ajax/libs/webfont/1/webfont.js';
+    wf.type = 'text/javascript';
+    wf.async = 'true';
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(wf, s);
+  })();
+</script>
+
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">Blog Name</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li><a href="/">/home</a></li>
+          <li><a href="/archive.html">/archive</a></li>
+          <li><a href="/tags.html">/tags</a></li>
+          <li><a href="/about.html">/about</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+
+<div class="wrapper">
+  <div class="content">
+    <div class="container container-center">
+      <div class="row">
+        <div class="col-md-8">
+          <div class="article">
+            <div class="well">
+              <h1><a href="/2016/07/uboot-fs">Uboot Fs</a></h1>
+              <div class="post-meta">
+                <div class="post-time">
+                  <i class="fa fa-calendar"></i>
+                  <time>03 Jul 2016</time>
+                </div>
+                <ul>
+                  
+                </ul>
+              </div>
+              <div class="post-content">
+                <div id="toc" class="toc"></div>
+                
+<h1 id="section">文件系统</h1>
+
+<h2 id="section-1">8. 文件系统</h2>
+
+<p>uboot 支持多种常见的文件系统，包括 fat 、 ext 、 jffs2 、 reiserfs 、 yaffs2 、 zfs 、ubifs 、cbfs 、cramfs 等。</p>
+
+<p>uboot 的文件系统有两种接口，一种是 <code class="highlighter-rouge">fs_*</code> 一种是具体的文件系统的接口，比如 yaffs2 的接口就是 <code class="highlighter-rouge">yaffs_*</code>。</p>
+
+<ol>
+  <li><code class="highlighter-rouge">fs_*</code></li>
+</ol>
+
+<p><code class="highlighter-rouge">fs_*</code> 实际上是对各种文件系统的封装，在 <code class="highlighter-rouge">fs/fs.c</code> 里定义了一个 <code class="highlighter-rouge">fstype</code> 类型的数组：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>static struct fstype_info fstypes[] = {
+#ifdef CONFIG_FS_FAT
+    {
+        .fstype = FS_TYPE_FAT,
+        .name = "fat",
+        .null_dev_desc_ok = false,
+        .probe = fat_set_blk_dev,
+        .close = fat_close,
+        .ls = file_fat_ls,
+        .exists = fat_exists,
+        .size = fat_size,
+        .read = fat_read_file,
+#ifdef CONFIG_FAT_WRITE
+        .write = file_fat_write,
+#else
+        .write = fs_write_unsupported,
+#endif
+        .uuid = fs_uuid_unsupported,
+    },
+#endif
+#ifdef CONFIG_FS_EXT4
+    {
+        .fstype = FS_TYPE_EXT,
+        .name = "ext4",
+        .null_dev_desc_ok = false,
+        .probe = ext4fs_probe,
+        .close = ext4fs_close,
+        .ls = ext4fs_ls,
+        .exists = ext4fs_exists,
+        .size = ext4fs_size,
+        .read = ext4_read_file,
+#ifdef CONFIG_CMD_EXT4_WRITE
+        .write = ext4_write_file,
+#else
+        .write = fs_write_unsupported,
+#endif
+        .uuid = ext4fs_uuid,
+    },
+#endif
+#ifdef CONFIG_SANDBOX
+    {
+        .fstype = FS_TYPE_SANDBOX,
+        .name = "sandbox",
+        .null_dev_desc_ok = true,
+        .probe = sandbox_fs_set_blk_dev,
+        .close = sandbox_fs_close,
+        .ls = sandbox_fs_ls,
+        .exists = sandbox_fs_exists,
+        .size = sandbox_fs_size,
+        .read = fs_read_sandbox,
+        .write = fs_write_sandbox,
+        .uuid = fs_uuid_unsupported,
+    },
+#endif
+#ifdef CONFIG_CMD_UBIFS
+    {
+        .fstype = FS_TYPE_UBIFS,
+        .name = "ubifs",
+        .null_dev_desc_ok = true,
+        .probe = ubifs_set_blk_dev,
+        .close = ubifs_close,
+        .ls = ubifs_ls,
+        .exists = ubifs_exists,
+        .size = ubifs_size,
+        .read = ubifs_read,
+        .write = fs_write_unsupported,
+        .uuid = fs_uuid_unsupported,
+    },
+#endif
+    {
+        .fstype = FS_TYPE_ANY,
+        .name = "unsupported",
+        .null_dev_desc_ok = true,
+        .probe = fs_probe_unsupported,
+        .close = fs_close_unsupported,
+        .ls = fs_ls_unsupported,
+        .exists = fs_exists_unsupported,
+        .size = fs_size_unsupported,
+        .read = fs_read_unsupported,
+        .write = fs_write_unsupported,
+        .uuid = fs_uuid_unsupported,
+    },
+};
+</code></pre>
+</div>
+
+<p>数组内包含了几种文件系统：fat 、 ext4 、ubifs 和实验用的 sandbox，而 fs 的接口函数，如 <code class="highlighter-rouge">fs_read()</code> 、 <code class="highlighter-rouge">fs_write()</code> 、 <code class="highlighter-rouge">fs_ls</code> 等，在执行操作时都是根据文件系统的类型调用不同文件系统接口：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>int fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
+	    loff_t *actread)
+{
+	struct fstype_info *info = fs_get_info(fs_type);
+...
+	ret = info-&gt;read(filename, buf, offset, len, actread);
+...
+	fs_close();
+
+	return ret;
+}
+</code></pre>
+</div>
+
+<p>其它操作也类似，首先根据文件系统类型（<code class="highlighter-rouge">fs_type</code>）获取到具体某个文件系统操作的数据结构（<code class="highlighter-rouge">fs_get_info()</code>），然后调用指定的操作（<code class="highlighter-rouge">info-&gt;read()</code>），最后关闭文件（<code class="highlighter-rouge">fs_close()</code>，<strong>uboot 的文件系统操作都是一次性的，即将open-&gt;ops-&gt;close 集成为一个 ops 操作函数</strong>）。</p>
+
+<ol>
+  <li>具体的文件系统</li>
+</ol>
+
+<p>具体的文件系统就比较简单，都提供 read 、 write 、 ls 接口（如上所述，uboot 不提供也不需要提供单独的 open 、 close 接口）。如 jffs2 的 read 接口：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>/* Load a file from flash into memory. fname can be a full path */
+u32
+jffs2_1pass_load(char *dest, struct part_info * part, const char *fname)
+{
+
+	struct b_lists *pl;
+	long ret = 1;
+	u32 inode;
+
+	if (! (pl  = jffs2_get_list(part, "load")))
+		return 0;
+
+	if (! (inode = jffs2_1pass_search_inode(pl, fname, 1))) {
+		putstr("load: Failed to find inode\r\n");
+		return 0;
+	}
+
+	/* Resolve symlinks */
+	if (! (inode = jffs2_1pass_resolve_inode(pl, inode))) {
+		putstr("load: Failed to resolve inode structure\r\n");
+		return 0;
+	}
+
+	if ((ret = jffs2_1pass_read_inode(pl, inode, dest)) &lt; 0) {
+		putstr("load: Failed to read inode\r\n");
+		return 0;
+	}
+
+	DEBUGF ("load: loaded '%s' to 0x%lx (%ld bytes)\n", fname,
+				(unsigned long) dest, ret);
+	return ret;
+}
+</code></pre>
+</div>
+
+<p>fat 的 write 接口：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>int file_fat_write(const char *filename, void *buffer, loff_t offset,
+		   loff_t maxsize, loff_t *actwrite)
+{
+	if (offset != 0) {
+		printf("Error: non zero offset is currently not supported.\n");
+		return -1;
+	}
+
+	printf("writing %s\n", filename);
+	return do_fat_write(filename, buffer, maxsize, actwrite);
+}
+</code></pre>
+</div>
+
+<p>ext4 的 ls 接口 ：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>int ext4fs_ls(const char *dirname)
+{
+	struct ext2fs_node *dirnode;
+	int status;
+
+	if (dirname == NULL)
+		return 0;
+
+	status = ext4fs_find_file(dirname, &amp;ext4fs_root-&gt;diropen, &amp;dirnode,
+				  FILETYPE_DIRECTORY);
+	if (status != 1) {
+		printf("** Can not find directory. **\n");
+		return 1;
+	}
+
+	ext4fs_iterate_dir(dirnode, NULL, NULL, NULL);
+	ext4fs_free_node(dirnode, &amp;ext4fs_root-&gt;diropen);
+
+	return 0;
+}
+</code></pre>
+</div>
+
+<p>uboot 的文件系统部分基本就是这两类，本身并不复杂，麻烦在于具体的文件系统实现：文件系统逻辑和存储设备操作接口。（此不赘述）</p>
+
+
+                
+
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 hidden-xs">
+          <div class="sidebar ">
+  <h2>Recent Posts</h2>
+  <ul>
+    
+    <li><a href="/2016/07/kernel_initcall">Kernel_initcall</a></li>
+    
+    <li><a href="/2016/07/linux_netstack">Linux_netstack</a></li>
+    
+    <li><a href="/2016/07/kernel_init">Kernel_init</a></li>
+    
+    <li><a href="/2016/07/intercept_syscall">Intercept_syscall</a></li>
+    
+    <li><a href="/2016/07/uboot-net">Uboot Net</a></li>
+    
+  </ul>
+</div>
+
+<div class="sidebar">
+  <h2>Tags</h2>
+  <ul>
+    
+  </ul>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+
+  </div>
+      <footer class="footer-distributed">
+      <div class="container">
+        <div class="footer">
+          <p>Pavel Makhov &copy; 2015</p>
+          <h6>Follow me</h6>
+
+<ul class="social-media">
+
+  
+    <li>
+      <a title="streetturtle on Github" href="https://github.com/streetturtle" target="_blank"><i class="fa fa-github fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on StackOverflow" href="http://stackoverflow.com/users/" target="_blank"><i class="fa fa-stack-overflow fa-2x"></i></a>
+    </li>
+  
+
+  
+
+  
+    <li>
+      <a title=" on Instagram" href="https://instagram.com/" target="_blank"><i class="fa fa-instagram fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on Last.fm" href="http://lastfm.com/user/" target="_blank"><i class="fa fa-lastfm fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title="feed.xml RSS" href="/feed.xml" target="_blank"><i class="fa fa-rss fa-2x"></i></a>
+    </li>
+  
+
+</ul>
+
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+</div>

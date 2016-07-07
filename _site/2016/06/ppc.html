@@ -1,0 +1,210 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Blog Name</title>
+  <meta name="theme-color" content="#222222" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
+  <script src="/js/header.js"></script>
+  <script src="/js/toc.js"></script>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/theme.css" rel="stylesheet">
+  <link href="/css/syntax.css" rel="stylesheet">
+  <link href="/css/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+  
+
+  
+
+
+ <script type="text/javascript">
+  WebFontConfig = {
+    google: {
+      families: ['Ubuntu::latin']
+    }
+  };
+  (function() {
+    var wf = document.createElement('script');
+    wf.src = ('https:' == document.location.protocol ? 'https' : 'http') +
+      '://ajax.googleapis.com/ajax/libs/webfont/1/webfont.js';
+    wf.type = 'text/javascript';
+    wf.async = 'true';
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(wf, s);
+  })();
+</script>
+
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">Blog Name</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li><a href="/">/home</a></li>
+          <li><a href="/archive.html">/archive</a></li>
+          <li><a href="/tags.html">/tags</a></li>
+          <li><a href="/about.html">/about</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+
+<div class="wrapper">
+  <div class="content">
+    <div class="container container-center">
+      <div class="row">
+        <div class="col-md-8">
+          <div class="article">
+            <div class="well">
+              <h1><a href="/2016/06/ppc">Ppc</a></h1>
+              <div class="post-meta">
+                <div class="post-time">
+                  <i class="fa fa-calendar"></i>
+                  <time>26 Jun 2016</time>
+                </div>
+                <ul>
+                  
+                </ul>
+              </div>
+              <div class="post-content">
+                <div id="toc" class="toc"></div>
+                
+<p>(以下内容试用于 freescale 的 mpc83xx 和 p1020 系列）</p>
+
+<ol>
+  <li>ddr ecc
+    <ul>
+      <li>mpc8308 和 p1020 都支持 ddr 的 ecc 校验，硬件上需要附加一块 ddr 作为 ecc 内存来存储 ecc 校验值，换言之要使能 ecc 需要两块 ddr ， 一块供程序使用，一块供 ecc 使用。</li>
+      <li>使能 ecc 需要在初始化 ddr 之前完成，对于 uboot 来说，就是要在初始化 ddr 控制器、将 flash 的数据拷贝到内存之前就把 ecc 相关的寄存器配置好，举个例子，对于 p1020 来说，需要在函数 <code class="highlighter-rouge">initdram()</code> 里调用 <code class="highlighter-rouge">ddr_enable_ecc()</code> 使能 ecc ,而 <code class="highlighter-rouge">initdram()</code> 就是再拷贝 flash 数据之前执行的， <code class="highlighter-rouge">ddr_enable_ecc()</code> 也是在配置 ddr 的过程中调用的。</li>
+      <li>使能完 ecc 之后不能立即读内存，因为此时的内存的 ecc 校验值都是乱的，直接读取内存肯定会发生 ecc 错误，所以执行之前需要把所有内存初始化一遍，即全部写一遍。</li>
+      <li>ppc 的 ddr ecc 支持纠正一位错，可以检测两位错和多位的 nibble 错（注：nibble 错误是啥？）。ecc 的校验算法和 FCM 的 ecc 校验算法相同。</li>
+    </ul>
+  </li>
+  <li>内存长度配置<br />
+  ppc 配置内存长度有多处寄存器需要设置：
+    <ul>
+      <li>LAW ： LAW_LAWBAR</li>
+      <li>localbus ： eLBC_ORg</li>
+      <li>ddr 控制器 ： DDR_CSn_BNDS</li>
+      <li>mmu ： tlb</li>
+    </ul>
+  </li>
+  <li>配置外部中断（p1020）<br />
+  配置寄存器 <code class="highlighter-rouge">PIC_EIVPRn</code> 设置中断优先级和中断触发方式（极性、edge or level sensitive），以及中断向量地址，以及寄存器 <code class="highlighter-rouge">PIC_EIDRn</code>，设置那个core 可以接收该中断和该中断是否是 critical interrupt 等。</li>
+</ol>
+
+<p>配置内部中断类似（配置寄存器 <code class="highlighter-rouge">PIC_IIDRn</code> 和 <code class="highlighter-rouge">PIC_IIVPRn</code>），不过不需要设置 edge or level sensitive。</p>
+
+<ol>
+  <li>
+    <p>processor ID 寄存器 （PIR）<br />
+  PIR 在文档说明是 read-only，但是实际上初始值为 0，每个 core 需要把自己的实际 ID 写到 PIR 寄存器里。如果要获取处理器 ID 最好读取寄存器 PIC_WHOAMI 获取处理器 ID</p>
+  </li>
+  <li>
+    <p>双核启动<br />
+  p1020 作为双核处理器有两种启动模式，一种是和其它多核处理器（如arm a9 x2）一样的模式，即 core 0 首先启动，然后由软件唤醒 core 1 （core 2、 core 3 、、、类似），另一种模式是两个 core 同时启动，分别直接从存储介质执行指令。</p>
+  </li>
+</ol>
+
+<p>大部分情况下都使用第一种模式，根据需要由软件控制 cpu 的启动顺序，这种也是通行方式；第二种方式在一些 rtos 中采用，比如 ucos 2/3 ，做法是两个 core 同时执行一份代码，然后根据所处的 core no 执行不同的代码分支。</p>
+
+
+                
+
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 hidden-xs">
+          <div class="sidebar ">
+  <h2>Recent Posts</h2>
+  <ul>
+    
+    <li><a href="/2016/07/kernel_initcall">Kernel_initcall</a></li>
+    
+    <li><a href="/2016/07/linux_netstack">Linux_netstack</a></li>
+    
+    <li><a href="/2016/07/kernel_init">Kernel_init</a></li>
+    
+    <li><a href="/2016/07/intercept_syscall">Intercept_syscall</a></li>
+    
+    <li><a href="/2016/07/uboot-net">Uboot Net</a></li>
+    
+  </ul>
+</div>
+
+<div class="sidebar">
+  <h2>Tags</h2>
+  <ul>
+    
+  </ul>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+
+  </div>
+      <footer class="footer-distributed">
+      <div class="container">
+        <div class="footer">
+          <p>Pavel Makhov &copy; 2015</p>
+          <h6>Follow me</h6>
+
+<ul class="social-media">
+
+  
+    <li>
+      <a title="streetturtle on Github" href="https://github.com/streetturtle" target="_blank"><i class="fa fa-github fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on StackOverflow" href="http://stackoverflow.com/users/" target="_blank"><i class="fa fa-stack-overflow fa-2x"></i></a>
+    </li>
+  
+
+  
+
+  
+    <li>
+      <a title=" on Instagram" href="https://instagram.com/" target="_blank"><i class="fa fa-instagram fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on Last.fm" href="http://lastfm.com/user/" target="_blank"><i class="fa fa-lastfm fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title="feed.xml RSS" href="/feed.xml" target="_blank"><i class="fa fa-rss fa-2x"></i></a>
+    </li>
+  
+
+</ul>
+
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+</div>

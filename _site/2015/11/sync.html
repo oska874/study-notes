@@ -1,0 +1,230 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Blog Name</title>
+  <meta name="theme-color" content="#222222" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
+  <script src="/js/header.js"></script>
+  <script src="/js/toc.js"></script>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/theme.css" rel="stylesheet">
+  <link href="/css/syntax.css" rel="stylesheet">
+  <link href="/css/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+  
+
+  
+
+
+ <script type="text/javascript">
+  WebFontConfig = {
+    google: {
+      families: ['Ubuntu::latin']
+    }
+  };
+  (function() {
+    var wf = document.createElement('script');
+    wf.src = ('https:' == document.location.protocol ? 'https' : 'http') +
+      '://ajax.googleapis.com/ajax/libs/webfont/1/webfont.js';
+    wf.type = 'text/javascript';
+    wf.async = 'true';
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(wf, s);
+  })();
+</script>
+
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">Blog Name</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li><a href="/">/home</a></li>
+          <li><a href="/archive.html">/archive</a></li>
+          <li><a href="/tags.html">/tags</a></li>
+          <li><a href="/about.html">/about</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+
+<div class="wrapper">
+  <div class="content">
+    <div class="container container-center">
+      <div class="row">
+        <div class="col-md-8">
+          <div class="article">
+            <div class="well">
+              <h1><a href="/2015/11/sync">Sync</a></h1>
+              <div class="post-meta">
+                <div class="post-time">
+                  <i class="fa fa-calendar"></i>
+                  <time>10 Nov 2015</time>
+                </div>
+                <ul>
+                  
+                </ul>
+              </div>
+              <div class="post-content">
+                <div id="toc" class="toc"></div>
+                <h1 id="syncthinghttpssyncthingnet">syncthing（https://syncthing.net/）</h1>
+
+<ol>
+  <li>安装
+    <ul>
+      <li>编译好的安装包</li>
+      <li>ubuntu 通过apt get 安装<br />
+ # Add the release PGP keys:</li>
+    </ul>
+
+    <p><code class="highlighter-rouge">curl -s https://syncthing.net/release-key.txt | sudo apt-key add -</code></p>
+
+    <p># Add the “release” channel to your APT sources:</p>
+
+    <p><code class="highlighter-rouge">echo "deb http://apt.syncthing.net/ syncthing release" | sudo tee /etc/apt/sources.list.d/syncthing.list</code></p>
+
+    <p># Update and install syncthing:</p>
+
+    <p><code class="highlighter-rouge">sudo apt-get update sudo apt-get install syncthing</code></p>
+  </li>
+</ol>
+
+<ul>
+  <li>编译源码(https://github.com/oska874/syncthing.git)</li>
+  <li>google play</li>
+</ul>
+
+<ol>
+  <li>使用
+    <ul>
+      <li>#syncthing 启动</li>
+    </ul>
+  </li>
+</ol>
+
+<ul>
+  <li>进入web 界面，配置：
+    <ul>
+      <li>127.0.0.1:8384</li>
+      <li>修改web管理页面监听地址为0.0.0.0:<port number="">，添加管理员账号和密码</port></li>
+      <li>重启</li>
+    </ul>
+  </li>
+  <li>多个设备互相添加</li>
+  <li>添加各自监视的文件夹（linux 下注意不同用户对不同文件夹权限不同，可能无法操作）</li>
+  <li>将共享文件夹共享给指定的设备</li>
+  <li>开始同步</li>
+</ul>
+
+<hr />
+
+<h1 id="bt-synchttpsgetsynccom">bt sync(https://getsync.com/)</h1>
+<ul>
+  <li>host 添加folder</li>
+  <li>分享：<br />
+   链接： 可以设置权限和有效期<br />
+   密钥和QR： 只读和读写权限</li>
+  <li>client 手动连接</li>
+</ul>
+
+
+                
+
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 hidden-xs">
+          <div class="sidebar ">
+  <h2>Recent Posts</h2>
+  <ul>
+    
+    <li><a href="/2016/07/kernel_initcall">Kernel_initcall</a></li>
+    
+    <li><a href="/2016/07/linux_netstack">Linux_netstack</a></li>
+    
+    <li><a href="/2016/07/kernel_init">Kernel_init</a></li>
+    
+    <li><a href="/2016/07/intercept_syscall">Intercept_syscall</a></li>
+    
+    <li><a href="/2016/07/uboot-net">Uboot Net</a></li>
+    
+  </ul>
+</div>
+
+<div class="sidebar">
+  <h2>Tags</h2>
+  <ul>
+    
+  </ul>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+
+  </div>
+      <footer class="footer-distributed">
+      <div class="container">
+        <div class="footer">
+          <p>Pavel Makhov &copy; 2015</p>
+          <h6>Follow me</h6>
+
+<ul class="social-media">
+
+  
+    <li>
+      <a title="streetturtle on Github" href="https://github.com/streetturtle" target="_blank"><i class="fa fa-github fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on StackOverflow" href="http://stackoverflow.com/users/" target="_blank"><i class="fa fa-stack-overflow fa-2x"></i></a>
+    </li>
+  
+
+  
+
+  
+    <li>
+      <a title=" on Instagram" href="https://instagram.com/" target="_blank"><i class="fa fa-instagram fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on Last.fm" href="http://lastfm.com/user/" target="_blank"><i class="fa fa-lastfm fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title="feed.xml RSS" href="/feed.xml" target="_blank"><i class="fa fa-rss fa-2x"></i></a>
+    </li>
+  
+
+</ul>
+
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+</div>

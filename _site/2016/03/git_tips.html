@@ -1,0 +1,278 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Blog Name</title>
+  <meta name="theme-color" content="#222222" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
+  <script src="/js/header.js"></script>
+  <script src="/js/toc.js"></script>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/theme.css" rel="stylesheet">
+  <link href="/css/syntax.css" rel="stylesheet">
+  <link href="/css/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+  
+
+  
+
+
+ <script type="text/javascript">
+  WebFontConfig = {
+    google: {
+      families: ['Ubuntu::latin']
+    }
+  };
+  (function() {
+    var wf = document.createElement('script');
+    wf.src = ('https:' == document.location.protocol ? 'https' : 'http') +
+      '://ajax.googleapis.com/ajax/libs/webfont/1/webfont.js';
+    wf.type = 'text/javascript';
+    wf.async = 'true';
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(wf, s);
+  })();
+</script>
+
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">Blog Name</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li><a href="/">/home</a></li>
+          <li><a href="/archive.html">/archive</a></li>
+          <li><a href="/tags.html">/tags</a></li>
+          <li><a href="/about.html">/about</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+
+<div class="wrapper">
+  <div class="content">
+    <div class="container container-center">
+      <div class="row">
+        <div class="col-md-8">
+          <div class="article">
+            <div class="well">
+              <h1><a href="/2016/03/git_tips">Git_tips</a></h1>
+              <div class="post-meta">
+                <div class="post-time">
+                  <i class="fa fa-calendar"></i>
+                  <time>19 Mar 2016</time>
+                </div>
+                <ul>
+                  
+                </ul>
+              </div>
+              <div class="post-content">
+                <div id="toc" class="toc"></div>
+                <ol>
+  <li>撤销未提交的修改</li>
+</ol>
+
+<p><code class="highlighter-rouge">
+    # 修改文件，之后撤销修改到上次提交状态
+    git checkout &lt;file&gt;
+    # 或者 ，文件已经进入暂存区，要恢复
+    git reset HEAD &lt;file&gt;
+    git checkout &lt;file&gt;
+ </code></p>
+
+<ol>
+  <li>
+    <p>修改文件之后，先git add 进入暂存区，然后再git commit</p>
+  </li>
+  <li>
+    <p>git reset 不会真的删除记录，使用git reflog 之后可以看到完整的log ，包括reset 操作。另，git reflog 只能看到本地的提交历史？</p>
+  </li>
+  <li>
+    <p>fetch</p>
+  </li>
+</ol>
+
+<p>Git中的fetch和pull,Git中从远程的分支获取最新的版本到本地有这样2个命令：</p>
+
+<p>4.1. git fetch：相当于是从远程获取最新版本到本地，不会自动merge<br />
+    <code class="highlighter-rouge">
+    git fetch origin master
+    git log -p master..origin/master
+    git merge origin/master
+   </code><br />
+    以上命令的含义：<br />
+    首先从远程的origin的master主分支下载最新的版本到origin/master分支上<br />
+    然后比较本地的master分支和origin/master分支的差别<br />
+    最后进行合并<br />
+    上述过程其实可以用以下更清晰的方式来进行：<br />
+    <code class="highlighter-rouge">
+    git fetch origin master:tmp
+    git diff tmp
+    git merge tmp
+   </code><br />
+    从远程获取最新的版本到本地的test分支上<br />
+    之后再进行比较合并</p>
+
+<p>4.2. git pull：相当于是从远程获取最新版本并merge到本地<br />
+    <code class="highlighter-rouge">
+    git pull origin master
+   </code><br />
+    上述命令其实相当于git fetch 和 git merge<br />
+    在实际使用中，git fetch更安全一些<br />
+    因为在merge前，我们可以查看更新情况，然后再决定是否合并</p>
+
+<ol>
+  <li>
+    <p>撤销提交<br />
+  本地：<br />
+ <code class="highlighter-rouge">git commit --amend</code><br />
+  远程：<br />
+ <code class="highlighter-rouge">
+ 删除远程的master git push origin :master
+ 本地修改
+ 将本地内容作为master 重新push
+ </code></p>
+  </li>
+  <li>
+    <p>github 添加ssh<br />
+  <code class="highlighter-rouge">
+ cd ~/.ssh
+ ssh-keygen -t rsa -C "your_email@example.com"
+ copy ~/.ssh/id_rsa.pub 到github 的ssh keys
+ </code></p>
+  </li>
+  <li>
+    <p>设置账户、邮箱</p>
+  </li>
+</ol>
+
+<p>单独：<br />
+    <code class="highlighter-rouge">
+    git config user.name anothergitaccount
+    git config user.email anothergitaccount@example.com
+   </code><br />
+  全局：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>  取消
+    ```
+    git config --global --unset user.name
+    git config --global --unset user.email
+     ```
+     
+  设置：
+    ```
+    git config --global user.name name
+    git config --global user.email email
+    ```
+</code></pre>
+</div>
+
+<ol>
+  <li>本地新建repo 再传给github<br />
+  <code class="highlighter-rouge">
+ 新建repo
+ git remote add origin 仓库地址。
+ git push -u origin master
+ </code></li>
+</ol>
+
+
+                
+
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 hidden-xs">
+          <div class="sidebar ">
+  <h2>Recent Posts</h2>
+  <ul>
+    
+    <li><a href="/2016/07/kernel_initcall">Kernel_initcall</a></li>
+    
+    <li><a href="/2016/07/linux_netstack">Linux_netstack</a></li>
+    
+    <li><a href="/2016/07/kernel_init">Kernel_init</a></li>
+    
+    <li><a href="/2016/07/intercept_syscall">Intercept_syscall</a></li>
+    
+    <li><a href="/2016/07/uboot-net">Uboot Net</a></li>
+    
+  </ul>
+</div>
+
+<div class="sidebar">
+  <h2>Tags</h2>
+  <ul>
+    
+  </ul>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+
+  </div>
+      <footer class="footer-distributed">
+      <div class="container">
+        <div class="footer">
+          <p>Pavel Makhov &copy; 2015</p>
+          <h6>Follow me</h6>
+
+<ul class="social-media">
+
+  
+    <li>
+      <a title="streetturtle on Github" href="https://github.com/streetturtle" target="_blank"><i class="fa fa-github fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on StackOverflow" href="http://stackoverflow.com/users/" target="_blank"><i class="fa fa-stack-overflow fa-2x"></i></a>
+    </li>
+  
+
+  
+
+  
+    <li>
+      <a title=" on Instagram" href="https://instagram.com/" target="_blank"><i class="fa fa-instagram fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title=" on Last.fm" href="http://lastfm.com/user/" target="_blank"><i class="fa fa-lastfm fa-2x"></i></a>
+    </li>
+  
+
+  
+    <li>
+      <a title="feed.xml RSS" href="/feed.xml" target="_blank"><i class="fa fa-rss fa-2x"></i></a>
+    </li>
+  
+
+</ul>
+
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+</div>
