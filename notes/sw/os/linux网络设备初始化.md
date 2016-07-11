@@ -16,12 +16,13 @@ linux 网络设备初始化
 <!-- /MarkdownTOC -->
 
 
-## 1. net_dev_init
-
 linux 下网络设备的实现分为两层：
 - 抽象设备层 ： 提供一些设备无关的处理流程，也提供一些公用的函数给底层的 device driver 调用。它为网络协议提供统一的发送、接收接口。这部分根据输入输出请求，通过特定设备驱动程序接口，来与设备进行通信。
 - 实际网卡驱动 ： 也就是具体的设备驱动程序，直接操作相应的设备。
 
+## 1. `net_dev_init()`
+
+`net_dev_init()` 是 kernel 启动时初始化网络设备的函数：
 
 
 ```
@@ -108,14 +109,14 @@ out:
 subsys_initcall(net_dev_init);
 ```
 
-`/proc` 、 `/sys` 、 每个 CPU 的 receive 队列 、 loopback 、 TX/RX softirq 、
+这个函数里面要完成初始化 `/proc` 和 `/sys` 的网络相关信息 、 每个 CPU 的 receive 队列 、 添加对 loopback 的操作接口、 打开发送和接收的软中断等。
 
+### 2. device driver init
 
-### device driver init
+系统启动时调用 `net_dev_init()` 初始化了网络的公共接口和操作，此时网络协议栈已经启动但是还不能使用，需要加载真正的网卡驱动，网卡驱动实现网络的真正功能：收发网络数据报文，加载网卡驱动亦即初始化网络设备。加载了网卡驱动之后网络协议栈的各个操作才能真正的实现。
 
-网卡驱动模块  `module_init`
+网卡驱动一般实现的功能就是 send 和 recv，以及设置网卡参数和访问 phy 的接口。
 
-### 
+#### 2.1. loopback 设备
 
-net namespace
-register_pernet_subsys
+loopback 是特殊的网络设备，它实际一个虚拟设备，主要用来调试网络。有单独的驱动实现 `drivers/net/loopback.c`，操作和一般的物理网卡一样。
