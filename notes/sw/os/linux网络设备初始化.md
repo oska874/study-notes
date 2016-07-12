@@ -9,9 +9,9 @@ linux 网络设备初始化
 
 <!-- MarkdownTOC -->
 
-- 1. net_dev_init
-    - device driver init
-    - 
+- 1. `net_dev_init\(\)`
+    - 2. device driver init
+        - 2.1. loopback 设备
 
 <!-- /MarkdownTOC -->
 
@@ -111,6 +111,22 @@ subsys_initcall(net_dev_init);
 
 这个函数里面要完成初始化 `/proc` 和 `/sys` 的网络相关信息 、 每个 CPU 的 receive 队列 、 添加对 loopback 的操作接口、 打开发送和接收的软中断等。
 
+执行完 `net_dev_init()` 之后，在 `device_initcall` 阶段会执行 `net_olddevs_init()` (`driver/net/Space.c`)
+
+```
+/*  Statically configured drivers -- order matters here. */
+static int __init net_olddevs_init(void)
+{
+...
+    for (num = 0; num < 8; ++num)
+        ethif_probe2(num);
+...
+}
+
+device_initcall(net_olddevs_init);
+```
+
+
 ### 2. device driver init
 
 系统启动时调用 `net_dev_init()` 初始化了网络的公共接口和操作，此时网络协议栈已经启动但是还不能使用，需要加载真正的网卡驱动，网卡驱动实现网络的真正功能：收发网络数据报文，加载网卡驱动亦即初始化网络设备。加载了网卡驱动之后网络协议栈的各个操作才能真正的实现。
@@ -120,3 +136,5 @@ subsys_initcall(net_dev_init);
 #### 2.1. loopback 设备
 
 loopback 是特殊的网络设备，它实际一个虚拟设备，主要用来调试网络。有单独的驱动实现 `drivers/net/loopback.c`，操作和一般的物理网卡一样。
+
+loopback 不像其他硬件网卡使用 module 加载驱动，而是将初始化函数放到了 `__net_initdata` 段，然后在 `net_dev_init()` 里面注册设备 `register_pernet_device(&loopback_net_ops)` 。
