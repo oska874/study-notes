@@ -1,10 +1,11 @@
 ---
-tags : [ net , kernel , Linux ]
+tags : [ net , Kernel , Linux ]
 ---
 
 
 <!-- MarkdownTOC -->
 
+- 0. socket 相关的系统调用
 - 1. 创建套接字（`socket`）
     - 1.1. 总结
 - 2. 连接（`connect`）
@@ -14,6 +15,10 @@ tags : [ net , kernel , Linux ]
 - 6. 关闭连接（`close`）
 
 <!-- /MarkdownTOC -->
+
+## 0. socket 相关的系统调用
+
+socket 的操作，如 `socket` 、 `connect` 、 `accept` 都是系统调用， C 库通过软件中断（不是 CPU 的软中断）进入内核态执行系统调用。
 
 ## 1. 创建套接字（`socket`）
 
@@ -263,6 +268,37 @@ static int sock_map_fd(struct socket *sock, int flags)
 5. 关联文件描述符和 socket 文件。
 
 ## 2. 连接（`connect`）
+
+应用层连接操作对应内核的函数是 `sys_connect` ，定义方法同 socket ：
+
+```
+SYSCALL_DEFINE3(connect, int, fd, struct sockaddr __user *, uservaddr,      
+        int, addrlen)                                                       
+{                                                                           
+    struct socket *sock;                                                    
+    struct sockaddr_storage address;                                        
+    int err, fput_needed;                                                   
+                                                                            
+    sock = sockfd_lookup_light(fd, &err, &fput_needed);                     
+    if (!sock)                                                              
+        goto out;                                                           
+    err = move_addr_to_kernel(uservaddr, addrlen, &address);                
+    if (err < 0)                                                            
+        goto out_put;                                                       
+                                                                            
+    err =                                                                   
+        security_socket_connect(sock, (struct sockaddr *)&address, addrlen);
+    if (err)                                                                
+        goto out_put;                                                       
+                                                                            
+    err = sock->ops->connect(sock, (struct sockaddr *)&address, addrlen,    
+                 sock->file->f_flags);                                      
+out_put:                                                                    
+    fput_light(sock->file, fput_needed);                                    
+out:                                                                        
+    return err;                                                             
+}                                                                           
+```
 
 
 ## 3. 绑定（`bind`）
