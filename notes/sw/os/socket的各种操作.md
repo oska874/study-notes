@@ -7,7 +7,9 @@ tags : [ net , Kernel , Linux ]
 
 - 0. socket 相关的系统调用
 - 1. 创建套接字（`socket`）
-    - 1.1. 总结
+    - 1.1. 创建 socket 文件：
+    - 1.2. 创建套接字文件并建立映射：
+    - 1.3. 总结
 - 2. 连接（`connect`）
 - 3. 绑定（`bind`）
 - 4. 发送
@@ -22,31 +24,12 @@ socket 的操作，如 `socket` 、 `connect` 、 `accept` 都是系统调用，
 
 ## 1. 创建套接字（`socket`）
 
-`sys_create` 
-
-`net/socket.c`
+套接字虽然也是文件，但是不能用 open 来创建，必须使用 socket 系统调用创建，`socket` 在内核对应的系统调用是 `sys_create` ，在 `net/socket.c` 定义，使用 `SYSCALL_DEFINE3` 宏定义的。
 
 ```
 SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
 {
-    int retval;
-    struct socket *sock;
-    int flags;
-
-    /* Check the SOCK_* constants for consistency.  */
-    BUILD_BUG_ON(SOCK_CLOEXEC != O_CLOEXEC);
-    BUILD_BUG_ON((SOCK_MAX | SOCK_TYPE_MASK) != SOCK_TYPE_MASK);
-    BUILD_BUG_ON(SOCK_CLOEXEC & SOCK_TYPE_MASK);
-    BUILD_BUG_ON(SOCK_NONBLOCK & SOCK_TYPE_MASK);
-
-    flags = type & ~SOCK_TYPE_MASK;
-    if (flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
-        return -EINVAL;
-    type &= SOCK_TYPE_MASK;
-
-    if (SOCK_NONBLOCK != O_NONBLOCK && (flags & SOCK_NONBLOCK))
-        flags = (flags & ~SOCK_NONBLOCK) | O_NONBLOCK;
-
+...
     retval = sock_create(family, type, protocol, &sock);
     if (retval < 0)
         goto out;
@@ -54,18 +37,13 @@ SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
     retval = sock_map_fd(sock, flags & (O_CLOEXEC | O_NONBLOCK));
     if (retval < 0)
         goto out_release;
-
-out:
-    /* It may be already another descriptor 8) Not kernel problem. */
-    return retval;
-
-out_release:
-    sock_release(sock);
-    return retval;
+...
 }
 ```
 
-主要是两个操作: 创建 socket（ `sock_create`） 和获取 socket 文件 id （`sock_map_fd`）。
+主要是两个操作: 创建 socket （ `sock_create`） 文件和获取 socket 文件描述符 （`sock_map_fd`）。
+
+### 1.1. 创建 socket 文件：
 
 ```
 int sock_create(int family, int type, int protocol, struct socket **res)           
@@ -184,7 +162,7 @@ out_sock_release:
 }
 ```
 
-`sock_alloc`
+首先获取 socket结构体和 i 节点:
 
 ```
 static struct socket *sock_alloc(void)
@@ -229,7 +207,7 @@ static struct socket *sock_alloc(void)
 
 到此 socket 和对应 inode 就创建好了并关联起来，下一步就是创建对应的套接字文件描述符并建立关联。
 
-创建套接字文件并建立映射：
+### 1.2. 创建套接字文件并建立映射：
 
 ```
 static int sock_map_fd(struct socket *sock, int flags)
@@ -256,7 +234,7 @@ static int sock_map_fd(struct socket *sock, int flags)
 2. `sock_alloc_file` 创建文件结构体
 3. `fd_install` 将 fd 和文件结构体关联起来
 
-### 1.1. 总结
+### 1.3. 总结
 
 应用层调用 socket 创建套接字在内核层要进行的操作可以分为 步：
 
