@@ -7,6 +7,7 @@
 
 1. 2015.7.25, ezio created
 2. 2016.6.26, ezio updated
+3. 2016.7.23, ezio updated
 
 ---
 
@@ -15,7 +16,12 @@
 
 ### TODO
 
-1. 完成 uboot 笔记
+1. Linux Netstack 笔记
+
+### changelog
+
+1. uboot study notes(启动、网络、驱动、shell、gd)
+
 
 ### study notes
 
