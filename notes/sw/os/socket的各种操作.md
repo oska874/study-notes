@@ -1,5 +1,6 @@
 ---
 tags : [ net , Kernel , Linux ]
+category : [ 读核 ]
 ---
 
 

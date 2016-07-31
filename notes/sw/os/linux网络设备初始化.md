@@ -1,5 +1,6 @@
 ---
-tags : linux , kernel , net
+tags : [ linux , kernel , net ]
+category : [ 读核 ]
 ---
 
 
