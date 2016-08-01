@@ -1,5 +1,6 @@
 ---
 tags : [Linux , Kernel]
+category : [ 读核 ]
 ---
 
 kernel 初始化过程
