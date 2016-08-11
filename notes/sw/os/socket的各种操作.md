@@ -4,24 +4,11 @@ category : [ 读核 ]
 ---
 
 
-<!-- MarkdownTOC -->
-
-- 0. socket 相关的系统调用
-- 1. 创建套接字（`socket`）
-    - 1.1. 创建 socket 文件：
-    - 1.2. 创建套接字文件并建立映射：
-    - 1.3. 总结
-- 2. 连接（`connect`）
-- 3. 绑定（`bind`）
-- 4. 发送
-- 5. 接收
-- 6. 关闭连接（`close`）
-
-<!-- /MarkdownTOC -->
-
 ## 0. socket 相关的系统调用
 
 socket 的操作，如 `socket` 、 `connect` 、 `accept` 都是系统调用， C 库通过软件中断（不是 CPU 的软中断）进入内核态执行系统调用。
+
+（本文使用的内核版本为 4.6.0 , 84787c572d4）
 
 ## 1. 创建套接字（`socket`）
 
@@ -396,7 +383,36 @@ static int sock_map_fd(struct socket *sock, int flags)
 4. 得到文件描述符；
 5. 关联文件描述符和 socket 文件。
 
-## 2. 连接（`connect`）
+## 2. 绑定（`bind`）
+
+`bind` 操作是服务器在创建了套接字之后进行的操作，用来讲套接字和本地 IP 地址关联起来。它的实现也位于 `net/socket.c` 中，作为系统调用也是通过宏 `SYSCALL_DEFINE3` 定义的，函数名为 `sys_bind` ，有三个参数：套接字文件描述符、套接字地址结构体、结构体长度。
+
+```
+SYSCALL_DEFINE3(bind, int, fd, struct sockaddr __user *, umyaddr, int, addrlen)
+{                                                                              
+    struct socket *sock;                                                       
+    struct sockaddr_storage address;                                           
+    int err, fput_needed;                                                      
+                                                                               
+    sock = sockfd_lookup_light(fd, &err, &fput_needed);                        
+    if (sock) {                                                                
+        err = move_addr_to_kernel(umyaddr, addrlen, &address);                 
+        if (err >= 0) {                                                        
+            err = security_socket_bind(sock,                                   
+                           (struct sockaddr *)&address,                        
+                           addrlen);                                           
+            if (!err)                                                          
+                err = sock->ops->bind(sock,                                    
+                              (struct sockaddr *)                              
+                              &address, addrlen);                              
+        }                                                                      
+        fput_light(sock->file, fput_needed);                                   
+    }                                                                          
+    return err;                                                                
+}                                                                              
+```
+
+## 3. 连接（`connect`）
 
 应用层连接操作对应内核的函数是 `sys_connect` ，定义方法同 socket ：
 
@@ -429,20 +445,449 @@ out:
 }                                                                           
 ```
 
+## 4. 监听（listen）
 
-## 3. 绑定（`bind`）
+## 5. 接受（accept）
 
-
-## 4. 发送
+## 6. 发送
 
 send ， sendto
 
 tcp ， udp
 
-## 5. 接收
+## 7. 接收
 
 recv ， recvfrom
 
 tcp ， udp
 
-## 6. 关闭连接（`close`）
+## 8. 关闭连接（`close`）
+
+## 9. ioctl
+
+`ioctl` 是标准库函数，大部分操作系统都会支持这个操作函数，它是内核模块和应用程序交互配置的一种手段，而且是同步操作。ioctl 函数在内核中对应的函数是 `sys_ioctl` ，这个接口的操作属于 `VFS` 的，不区分用户要对哪种文件系统进行 ioctl ，只根据用户之前打开的文件类型来推断正确的调用路径。
+
+`ioctl` 对应内核的系统调用是 `vfs_ioctl` ， 它会通过 `filp->f_op->unlocked_ioctl(...)` 文件对应的 `ioctl` 实现。对于套接字来说调用的就是 `sock_ioctl` 。 
+
+`socket` 对应 vfs 的文件操作（ `file_operations` ） 为 `socket_file_ops` ，创建套接字时会调用 `sock_alloc_file()` ，这个函数会将 `socket_file_ops` 和 套接字文件关联起来（ `file = alloc_file(&path, FMODE_READ | FMODE_WRITE,&socket_file_ops);`）， `socket_file_ops` 定义在 `net/socket.c` ：
+
+```
+static const struct file_operations socket_file_ops = {
+    .owner =    THIS_MODULE,                           
+    .llseek =   no_llseek,                             
+    .read_iter =    sock_read_iter,                    
+    .write_iter =   sock_write_iter,                   
+    .poll =     sock_poll,                             
+    .unlocked_ioctl = sock_ioctl,                      
+#ifdef CONFIG_COMPAT                                   
+    .compat_ioctl = compat_sock_ioctl,                 
+#endif                                                 
+    .mmap =     sock_mmap,                             
+    .release =  sock_close,                            
+    .fasync =   sock_fasync,                           
+    .sendpage = sock_sendpage,                         
+    .splice_write = generic_splice_sendpage,           
+    .splice_read =  sock_splice_read,                  
+};                                                     
+```
+
+其中就指明了 `socket` 对应的 `ioctl` 为 `sock_ioctl` ， 定义在 `net/socket.c` ：
+
+```
+/*                                                                        
+ *  With an ioctl, arg may well be a user mode pointer, but we don't know 
+ *  what to do with it - that's up to the protocol still.                 
+ */                                                                       
+                                                                          
+static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
+{                                                                         
+    struct socket *sock;                                                  
+    struct sock *sk;                                                      
+    void __user *argp = (void __user *)arg;                               
+    int pid, err;                                                         
+    struct net *net;                                                      
+                                                                          
+    sock = file->private_data;                                            
+    sk = sock->sk;                                                        
+    net = sock_net(sk);                                                   
+    if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {          
+        err = dev_ioctl(net, cmd, argp);                                  
+    } else                                                                
+#ifdef CONFIG_WEXT_CORE                                                   
+    if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST) {                        
+        err = dev_ioctl(net, cmd, argp);                                  
+    } else                                                                
+#endif                                                                    
+        switch (cmd) {                                                    
+        case FIOSETOWN:                                                   
+        case SIOCSPGRP:                                                   
+            err = -EFAULT;                                                
+            if (get_user(pid, (int __user *)argp))                        
+                break;                                                    
+            f_setown(sock->file, pid, 1);                                 
+            err = 0;                                                      
+            break;                                  
+        case FIOGETOWN:                             
+        case SIOCGPGRP:                             
+            err = put_user(f_getown(sock->file),    
+                       (int __user *)argp);         
+            break;                                  
+        case SIOCGIFBR:                             
+        case SIOCSIFBR:                             
+        case SIOCBRADDBR:                           
+        case SIOCBRDELBR:                           
+            err = -ENOPKG;                          
+            if (!br_ioctl_hook)                     
+                request_module("bridge");           
+                                                    
+            mutex_lock(&br_ioctl_mutex);            
+            if (br_ioctl_hook)                      
+                err = br_ioctl_hook(net, cmd, argp);
+            mutex_unlock(&br_ioctl_mutex);          
+            break;                                  
+        case SIOCGIFVLAN:                           
+        case SIOCSIFVLAN:                           
+            err = -ENOPKG;                          
+            if (!vlan_ioctl_hook)                   
+                request_module("8021q");            
+                                                    
+            mutex_lock(&vlan_ioctl_mutex);          
+            if (vlan_ioctl_hook)                    
+                err = vlan_ioctl_hook(net, argp);   
+            mutex_unlock(&vlan_ioctl_mutex);        
+            break;                                  
+        case SIOCADDDLCI:                            
+        case SIOCDELDLCI:                            
+            err = -ENOPKG;                           
+            if (!dlci_ioctl_hook)                    
+                request_module("dlci");              
+                                                     
+            mutex_lock(&dlci_ioctl_mutex);           
+            if (dlci_ioctl_hook)                     
+                err = dlci_ioctl_hook(cmd, argp);    
+            mutex_unlock(&dlci_ioctl_mutex);         
+            break;                                   
+        default:                                     
+            err = sock_do_ioctl(net, sock, cmd, arg);
+            break;                                   
+        }                                            
+    return err;                                      
+}                                                    
+```
+
+从代码可以看到 `sock_ioctl` 支持多个选项，对于套接字网络设备来说最主要的处理函数是 `sock_do_ioctl()` 和 `dev_ioctl()` ：
+
+`net/socket.c`
+
+```
+static long sock_do_ioctl(struct net *net, struct socket *sock,
+                 unsigned int cmd, unsigned long arg)          
+{                                                              
+    int err;                                                   
+    void __user *argp = (void __user *)arg;                    
+                                                               
+    err = sock->ops->ioctl(sock, cmd, arg);                    
+                                                               
+    /*                                                         
+     * If this ioctl is unknown try to hand it down            
+     * to the NIC driver.                                      
+     */                                                        
+    if (err == -ENOIOCTLCMD)                                   
+        err = dev_ioctl(net, cmd, argp);                       
+                                                               
+    return err;                                                
+}                                                              
+```
+
+其中 `sock->ops` 的值是在 `inet_create` 赋值的： `sock->ops = answer->ops;` ，而 `answer` 对应的就是 `inetsw[]` ，`inetsw` 数组是在网络协议栈初始化时赋值的对应的内容就是数组 `inetsw_array` （参见**linux网络协议栈初始化** 3.2. 添加网络协议 `inet_add_protocol()`）。
+
+ `sock->ops->ioctl` 调用的函数会根据套接字类型不同而而不同，以 tcp 为例，`sock->ops` 对应 `inet_stream_ops` ：
+
+`net/ipv4/af_inet.c` 
+
+```
+ const struct proto_ops inet_stream_ops = {             
+    .family        = PF_INET,                          
+    .owner         = THIS_MODULE,                      
+    .release       = inet_release,                     
+    .bind          = inet_bind,                        
+    .connect       = inet_stream_connect,              
+    .socketpair    = sock_no_socketpair,               
+    .accept        = inet_accept,                      
+    .getname       = inet_getname,                     
+    .poll          = tcp_poll,                         
+    .ioctl         = inet_ioctl,                       
+    .listen        = inet_listen,                      
+    .shutdown      = inet_shutdown,                    
+    .setsockopt    = sock_common_setsockopt,           
+    .getsockopt    = sock_common_getsockopt,           
+    .sendmsg       = inet_sendmsg,                     
+    .recvmsg       = inet_recvmsg,                     
+    .mmap          = sock_no_mmap,                     
+    .sendpage      = inet_sendpage,                    
+    .splice_read       = tcp_splice_read,              
+#ifdef CONFIG_COMPAT                                   
+    .compat_setsockopt = compat_sock_common_setsockopt,
+    .compat_getsockopt = compat_sock_common_getsockopt,
+    .compat_ioctl      = inet_compat_ioctl,            
+#endif                                                 
+};                                                     
+EXPORT_SYMBOL(inet_stream_ops);                        
+```
+
+其中 `ioctl` 对应的就是 `inet_ioctl` ：
+
+`net/ipv4/af_inet.c`
+
+```
+/*                                                                      
+ *  ioctl() calls you can issue on an INET socket. Most of these are    
+ *  device configuration and stuff and very rarely used. Some ioctls    
+ *  pass on to the socket itself.                                       
+ *                                                                      
+ *  NOTE: I like the idea of a module for the config stuff. ie ifconfig 
+ *  loads the devconfigure module does its configuring and unloads it.  
+ *  There's a good 20K of config code hanging around the kernel.        
+ */                                                                     
+                                                                        
+int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+{                                                                       
+    struct sock *sk = sock->sk;                                         
+    int err = 0;                                                        
+    struct net *net = sock_net(sk);                                     
+                                                                        
+    switch (cmd) {                                                      
+    case SIOCGSTAMP:                                                    
+        err = sock_get_timestamp(sk, (struct timeval __user *)arg);     
+        break;                                                          
+    case SIOCGSTAMPNS:                                                  
+        err = sock_get_timestampns(sk, (struct timespec __user *)arg);  
+        break;                                                          
+    case SIOCADDRT:                                                     
+    case SIOCDELRT:                                                     
+    case SIOCRTMSG:                                                     
+        err = ip_rt_ioctl(net, cmd, (void __user *)arg);                
+        break;                                                          
+    case SIOCDARP:                                                      
+    case SIOCGARP:                                                      
+    case SIOCSARP:                                                      
+        err = arp_ioctl(net, cmd, (void __user *)arg);                  
+        break;                                                          
+    case SIOCGIFADDR:                                                   
+    case SIOCSIFADDR:                                                   
+    case SIOCGIFBRDADDR:                                                
+    case SIOCSIFBRDADDR:                                                
+    case SIOCGIFNETMASK:                                  
+    case SIOCSIFNETMASK:                                  
+    case SIOCGIFDSTADDR:                                  
+    case SIOCSIFDSTADDR:                                  
+    case SIOCSIFPFLAGS:                                   
+    case SIOCGIFPFLAGS:                                   
+    case SIOCSIFFLAGS:                                    
+        err = devinet_ioctl(net, cmd, (void __user *)arg);
+        break;                                            
+    default:                                              
+        if (sk->sk_prot->ioctl)                           
+            err = sk->sk_prot->ioctl(sk, cmd, arg);       
+        else                                              
+            err = -ENOIOCTLCMD;                           
+        break;                                            
+    }                                                     
+    return err;                                           
+}                                                         
+EXPORT_SYMBOL(inet_ioctl);                                
+```
+
+
+而 `dev_ioctl` 则是针对网络设备的各种操作。
+
+`net/core/dev_ioctl.c`
+
+```
+/**                                                                   
+ *  dev_ioctl   -   network device ioctl                              
+ *  @net: the applicable net namespace                                
+ *  @cmd: command to issue                                            
+ *  @arg: pointer to a struct ifreq in user space                     
+ *                                                                    
+ *  Issue ioctl functions to devices. This is normally called by the  
+ *  user space syscall interfaces but can sometimes be useful for     
+ *  other purposes. The return value is the return from the syscall if
+ *  positive or a negative errno code on error.                       
+ */                                                                   
+                                                                      
+int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)    
+{                                                                     
+    struct ifreq ifr;                                                 
+    int ret;                                                          
+    char *colon;                                                      
+                                                                      
+    /* One special case: SIOCGIFCONF takes ifconf argument            
+       and requires shared lock, because it sleeps writing            
+       to user space.                                                 
+     */                                                               
+                                                                      
+    if (cmd == SIOCGIFCONF) {                                         
+        rtnl_lock();                                                  
+        ret = dev_ifconf(net, (char __user *) arg);                   
+        rtnl_unlock();                                                
+        return ret;                                                   
+    }                                                                 
+    if (cmd == SIOCGIFNAME)                                           
+        return dev_ifname(net, (struct ifreq __user *)arg);           
+                                                                      
+    if (copy_from_user(&ifr, arg, sizeof(struct ifreq)))              
+        return -EFAULT;                                               
+    ifr.ifr_name[IFNAMSIZ-1] = 0;                       
+                                                        
+    colon = strchr(ifr.ifr_name, ':');                  
+    if (colon)                                          
+        *colon = 0;                                     
+                                                        
+    /*                                                  
+     *  See which interface the caller is talking about.
+     */                                                 
+                                                        
+    switch (cmd) {                                      
+    /*                                                  
+     *  These ioctl calls:                              
+     *  - can be done by all.                           
+     *  - atomic and do not require locking.            
+     *  - return a value                                
+     */                                                 
+    case SIOCGIFFLAGS:                                  
+    case SIOCGIFMETRIC:                                 
+    case SIOCGIFMTU:                                    
+    case SIOCGIFHWADDR:                                 
+    case SIOCGIFSLAVE:                                  
+    case SIOCGIFMAP:                                    
+    case SIOCGIFINDEX:                                  
+    case SIOCGIFTXQLEN:                                 
+        dev_load(net, ifr.ifr_name);                    
+        rcu_read_lock();                                
+        ret = dev_ifsioc_locked(net, &ifr, cmd);        
+        rcu_read_unlock();                              
+        if (!ret) {                                     
+            if (colon)                                  
+                *colon = ':';                           
+            if (copy_to_user(arg, &ifr,                 
+                     sizeof(struct ifreq)))             
+                ret = -EFAULT;                          
+        }                                               
+        return ret;                                     
+        return ret;                                  
+                                                     
+    case SIOCETHTOOL:                                
+        dev_load(net, ifr.ifr_name);                 
+        rtnl_lock();                                 
+        ret = dev_ethtool(net, &ifr);                
+        rtnl_unlock();                               
+        if (!ret) {                                  
+            if (colon)                               
+                *colon = ':';                        
+            if (copy_to_user(arg, &ifr,              
+                     sizeof(struct ifreq)))          
+                ret = -EFAULT;                       
+        }                                            
+        return ret;                                  
+                                                     
+    /*                                               
+     *  These ioctl calls:                           
+     *  - require superuser power.                   
+     *  - require strict serialization.              
+     *  - return a value                             
+     */                                              
+    case SIOCGMIIPHY:                                
+    case SIOCGMIIREG:                                
+    case SIOCSIFNAME:                                
+        if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+            return -EPERM;                           
+        dev_load(net, ifr.ifr_name);                 
+        rtnl_lock();                                 
+        ret = dev_ifsioc(net, &ifr, cmd);            
+        rtnl_unlock();                               
+        if (!ret) {                                  
+            if (colon)                               
+                *colon = ':';                        
+            if (copy_to_user(arg, &ifr,              
+                     sizeof(struct ifreq)))          
+                ret = -EFAULT;                       
+        } 
+    /*                                               
+     *  These ioctl calls:                           
+     *  - require superuser power.                   
+     *  - require strict serialization.              
+     *  - do not return a value                      
+     */                                              
+    case SIOCSIFMAP:                                 
+    case SIOCSIFTXQLEN:                              
+        if (!capable(CAP_NET_ADMIN))                 
+            return -EPERM;                           
+        /* fall through */                           
+    /*                                               
+     *  These ioctl calls:                           
+     *  - require local superuser power.             
+     *  - require strict serialization.              
+     *  - do not return a value                      
+     */                                              
+    case SIOCSIFFLAGS:                               
+    case SIOCSIFMETRIC:                              
+    case SIOCSIFMTU:                                 
+    case SIOCSIFHWADDR:                              
+    case SIOCSIFSLAVE:                               
+    case SIOCADDMULTI:                               
+    case SIOCDELMULTI:                               
+    case SIOCSIFHWBROADCAST:                         
+    case SIOCSMIIREG:                                
+    case SIOCBONDENSLAVE:                            
+    case SIOCBONDRELEASE:                            
+    case SIOCBONDSETHWADDR:                          
+    case SIOCBONDCHANGEACTIVE:                       
+    case SIOCBRADDIF:                                
+    case SIOCBRDELIF:                                
+    case SIOCSHWTSTAMP:                              
+        if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+            return -EPERM;                           
+        /* fall through */                           
+    case SIOCBONDSLAVEINFOQUERY:                     
+    case SIOCBONDINFOQUERY:                          
+        dev_load(net, ifr.ifr_name);                           
+        rtnl_lock();                                           
+        ret = dev_ifsioc(net, &ifr, cmd);                      
+        rtnl_unlock();                                         
+        return ret;                                            
+                                                               
+    case SIOCGIFMEM:                                           
+        /* Get the per device memory space. We can add this but
+         * currently do not support it */                      
+    case SIOCSIFMEM:                                           
+        /* Set the per device memory buffer space.             
+         * Not applicable in our case */                       
+    case SIOCSIFLINK:                                          
+        return -ENOTTY;                                        
+                                                               
+    /*                                                         
+     *  Unknown or private ioctl.                              
+     */                                                        
+    default:                                                   
+        if (cmd == SIOCWANDEV ||                               
+            cmd == SIOCGHWTSTAMP ||                            
+            (cmd >= SIOCDEVPRIVATE &&                          
+             cmd <= SIOCDEVPRIVATE + 15)) {                    
+            dev_load(net, ifr.ifr_name);                       
+            rtnl_lock();                                       
+            ret = dev_ifsioc(net, &ifr, cmd);                  
+            rtnl_unlock();                                     
+            if (!ret && copy_to_user(arg, &ifr,                
+                         sizeof(struct ifreq)))                
+                ret = -EFAULT;                                 
+            return ret;                                        
+        }                                                      
+        /* Take care of Wireless Extensions */                 
+        if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST)           
+            return wext_handle_ioctl(net, &ifr, cmd, arg);     
+        return -ENOTTY;                                        
+    }
+}
+```
+
