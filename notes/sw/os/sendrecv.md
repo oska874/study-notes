@@ -341,7 +341,10 @@ out_err:
 
 同理 udp 最终调用了 `udp_sendmsg` (`net/ipv4/udp.c`) 。
 
-`sys_sendmsg` 跟 `send` 和 `sendto` 的最大区别就是 `struc msghdr` 由用户来构建完成。
+
+`sys_sendto` 使用 `struct msghdr` 保存数据,所以在 `sys_sendto` 中一开始要解析 buff 并与 msg 关联起来，就是为了后面发送用。进入 `tcp_sendmsg` 后会将 `msghdr` 转换成 `sk_buff` 再发送。`sys_sendmsg` 跟 `send` 和 `sendto` 的最大区别就是 `struc msghdr` 由用户来构建完成。
+
+
 
 ## 7. 接收
 
@@ -855,3 +858,7 @@ SYSCALL_DEFINE2(shutdown, int, fd, int, how)
 	return err;
 }
 ```
+
+## 10. 总结
+
+linux 下的 socket 操作可以分为两部分：操作系统自身的处理架构和对 tcp/ip 协议的实现。上面的内容主要讲了 linux 是如何在用户空间接受应用发出的 socket 请求，以及在内核空间如何将这些请求、文件系统（vfs）、 socket 操作流程以及相关的数据结构（如 `sk_buf` ）关联起来，并没有细述协议栈如何解析数据包和如何实现标准协议的路由、收发包等。
