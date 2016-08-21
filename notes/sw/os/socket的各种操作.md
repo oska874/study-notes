@@ -451,9 +451,85 @@ out:
 
 ## 6. 发送
 
-send ， sendto
+[][send1]
 
-tcp ， udp
+send 
+
+```
+/*                                                              
+ *  Send a datagram down a socket.                              
+ */                                                             
+                                                                
+SYSCALL_DEFINE4(send, int, fd, void __user *, buff, size_t, len,
+        unsigned int, flags)                                    
+{                                                               
+    return sys_sendto(fd, buff, len, flags, NULL, 0);           
+}                                                               
+```
+
+sendto
+
+```
+/*                                                                      
+ *  Send a datagram to a given address. We move the address into kernel 
+ *  space and check the user space data area is readable before invoking
+ *  the protocol.                                                       
+ */                                                                     
+                                                                        
+SYSCALL_DEFINE6(sendto, int, fd, void __user *, buff, size_t, len,      
+        unsigned int, flags, struct sockaddr __user *, addr,            
+        int, addr_len)                                                  
+{                                                                       
+    struct socket *sock;                                                
+    struct sockaddr_storage address;                                    
+    int err;                                                            
+    struct msghdr msg;                                                  
+    struct iovec iov;                                                   
+    int fput_needed;                                                    
+                                                                        
+    err = import_single_range(WRITE, buff, len, &iov, &msg.msg_iter);   
+    if (unlikely(err))                                                  
+        return err;                                                     
+    sock = sockfd_lookup_light(fd, &err, &fput_needed);                 
+    if (!sock)                                                          
+        goto out;                                                       
+                                                                        
+    msg.msg_name = NULL;                                                
+    msg.msg_control = NULL;                                             
+    msg.msg_controllen = 0;                                             
+    msg.msg_namelen = 0;                                                
+    if (addr) {                                                         
+        err = move_addr_to_kernel(addr, addr_len, &address);            
+        if (err < 0)                                                    
+            goto out_put;                                               
+        msg.msg_name = (struct sockaddr *)&address;                     
+        msg.msg_namelen = addr_len;                                     
+    }                                                                   
+    if (sock->file->f_flags & O_NONBLOCK)                               
+        flags |= MSG_DONTWAIT;                                          
+    msg.msg_flags = flags;                                              
+    err = sock_sendmsg(sock, &msg);                                     
+                                                                        
+out_put:                                                                
+    fput_light(sock->file, fput_needed);                                
+out:                                                                    
+    return err;                                                         
+}                                                                       
+```
+
+
+sendmsg
+
+```
+SYSCALL_DEFINE3(sendmsg, int, fd, struct user_msghdr __user *, msg, unsigned int, flags)
+{                                                                                       
+    if (flags & MSG_CMSG_COMPAT)                                                        
+        return -EINVAL;                                                                 
+    return __sys_sendmsg(fd, msg, flags);                                               
+}    
+```
+
+
 
 ## 7. 接收
 
@@ -698,12 +774,264 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 EXPORT_SYMBOL(inet_ioctl);                                
 ```
 
+根据选项的不同，再分别调用不同的处理函数 `ip_rt_ioctl` ， `arp_ioctl` ， `devinet_ioctl` ， `sk->sk_prot->ioctl` ，其中 `sk->sk_prot->ioctl` 调用的函数是套接字类型对应的 `inetsw_array[]` 的 `ioctl` 成员变量（如，tcp 对应的就是 `tcp_ioctl` ）。
 
-而 `dev_ioctl` 则是针对网络设备的各种操作。
+其中 `devinet_ioctl` 用来处理和网卡相关的操作选项，比如掩码（ SIOCSIFNETMASK ）、地址（ SIOCGIFADDR ）等：
+
+```
+int devinet_ioctl(struct net *net, unsigned int cmd, void __user *arg
+{
+    struct ifreq ifr;
+    struct sockaddr_in sin_orig;
+    struct sockaddr_in *sin = (struct sockaddr_in *)&ifr.ifr_addr;
+    struct in_device *in_dev;
+    struct in_ifaddr **ifap = NULL;
+    struct in_ifaddr *ifa = NULL;
+    struct net_device *dev;
+    char *colon;
+    int ret = -EFAULT;
+    int tryaddrmatch = 0;
+
+    /*
+     *  Fetch the caller's info block into kernel space
+     */
+
+    if (copy_from_user(&ifr, arg, sizeof(struct ifreq)))
+        goto out;
+    ifr.ifr_name[IFNAMSIZ - 1] = 0;
+
+    /* save original address for comparison */
+    memcpy(&sin_orig, sin, sizeof(*sin));
+
+    colon = strchr(ifr.ifr_name, ':');
+    if (colon)
+        *colon = 0;
+
+    dev_load(net, ifr.ifr_name);
+
+    switch (cmd) {
+    case SIOCGIFADDR:   /* Get interface address */
+    case SIOCGIFBRDADDR:    /* Get the broadcast address */
+    case SIOCGIFDSTADDR:    /* Get the destination address */
+    case SIOCGIFNETMASK:    /* Get the netmask for the interface */
+        /* Note that these ioctls will not sleep,
+           so that we do not impose a lock.
+           One day we will be forced to put shlock here (I mean SMP)
+         */
+        tryaddrmatch = (sin_orig.sin_family == AF_INET);
+        memset(sin, 0, sizeof(*sin));
+        sin->sin_family = AF_INET;
+        break;
+
+    case SIOCSIFFLAGS:
+        ret = -EPERM;
+        if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+            goto out;
+        break;
+    case SIOCSIFADDR:   /* Set interface address (and family) */
+    case SIOCSIFBRDADDR:    /* Set the broadcast address */
+    case SIOCSIFDSTADDR:    /* Set the destination address */
+    case SIOCSIFNETMASK:    /* Set the netmask for the interface */
+        ret = -EPERM;
+        if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+            goto out;
+        ret = -EINVAL;
+        if (sin->sin_family != AF_INET)                            
+            goto out;                                              
+        break;                                                     
+    default:                                                       
+        ret = -EINVAL;                                             
+        goto out;                                                  
+    }                                                              
+                                                                   
+    rtnl_lock();                                                   
+                                                                   
+    ret = -ENODEV;                                                 
+    dev = __dev_get_by_name(net, ifr.ifr_name);                    
+    if (!dev)                                                      
+        goto done;                                                 
+                                                                   
+    if (colon)                                                     
+        *colon = ':';                                              
+                                                                   
+    in_dev = __in_dev_get_rtnl(dev);                               
+    if (in_dev) {                                                  
+        if (tryaddrmatch) {                                        
+            /* Matthias Andree */                                  
+            /* compare label and address (4.4BSD style) */         
+            /* note: we only do this for a limited set of ioctls   
+               and only if the original address family was AF_INET.
+               This is checked above. */                           
+            for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;  
+                 ifap = &ifa->ifa_next) {                          
+                if (!strcmp(ifr.ifr_name, ifa->ifa_label) &&       
+                    sin_orig.sin_addr.s_addr ==                    
+                            ifa->ifa_local) {                      
+                    break; /* found */                             
+                }                                                  
+            }                                                      
+        }                                                          
+        /* we didn't get a match, maybe the application is         
+           4.3BSD-style and passed in junk so we fall back to      
+           comparing just the label */                             
+        if (!ifa) {                                                
+            for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;  
+                 ifap = &ifa->ifa_next)                            
+                if (!strcmp(ifr.ifr_name, ifa->ifa_label))         
+                    break;                                         
+        }                                                          
+    }                                                              
+                                                                   
+    ret = -EADDRNOTAVAIL;                                          
+    if (!ifa && cmd != SIOCSIFADDR && cmd != SIOCSIFFLAGS)         
+        goto done;                                                 
+                                                                   
+    switch (cmd) {                                                 
+    case SIOCGIFADDR:   /* Get interface address */                
+        sin->sin_addr.s_addr = ifa->ifa_local;                     
+        goto rarok;                                                
+                                                                   
+    case SIOCGIFBRDADDR:    /* Get the broadcast address */        
+        sin->sin_addr.s_addr = ifa->ifa_broadcast;                 
+        sin->sin_addr.s_addr = ifa->ifa_broadcast;                 
+        goto rarok;                                                
+                                                                   
+    case SIOCGIFDSTADDR:    /* Get the destination address */      
+        sin->sin_addr.s_addr = ifa->ifa_address;                   
+        goto rarok;                                                
+                                                                   
+    case SIOCGIFNETMASK:    /* Get the netmask for the interface */
+        sin->sin_addr.s_addr = ifa->ifa_mask;                      
+        goto rarok;                                                
+                                                                   
+    case SIOCSIFFLAGS:                                             
+        if (colon) {                                               
+            ret = -EADDRNOTAVAIL;                                  
+            if (!ifa)                                              
+                break;                                             
+            ret = 0;                                               
+            if (!(ifr.ifr_flags & IFF_UP))                         
+                inet_del_ifa(in_dev, ifap, 1);                     
+            break;                                                 
+        }                                                          
+        ret = dev_change_flags(dev, ifr.ifr_flags);                
+        break;                                                     
+                                                                   
+    case SIOCSIFADDR:   /* Set interface address (and family) */   
+        ret = -EINVAL;                                             
+        if (inet_abc_len(sin->sin_addr.s_addr) < 0)                
+            break;                                                 
+                                                                   
+        if (!ifa) {                                                
+            ret = -ENOBUFS;                                        
+            ifa = inet_alloc_ifa();                                
+            if (!ifa)                                              
+                break;                                             
+            INIT_HLIST_NODE(&ifa->hash);                           
+            if (colon)                                             
+                memcpy(ifa->ifa_label, ifr.ifr_name, IFNAMSIZ);    
+            else                                                   
+                memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);       
+        } else {                                                   
+            ret = 0;                                               
+            if (ifa->ifa_local == sin->sin_addr.s_addr)            
+                break;                                             
+            inet_del_ifa(in_dev, ifap, 0);                         
+            ifa->ifa_broadcast = 0;                                
+            ifa->ifa_scope = 0;                                    
+        }                                                          
+                                                                   
+        ifa->ifa_address = ifa->ifa_local = sin->sin_addr.s_addr;  
+                                                                   
+        if (!(dev->flags & IFF_POINTOPOINT)) {                     
+            ifa->ifa_prefixlen = inet_abc_len(ifa->ifa_address);   
+            ifa->ifa_mask = inet_make_mask(ifa->ifa_prefixlen);    
+            if ((dev->flags & IFF_BROADCAST) &&                    
+                ifa->ifa_prefixlen < 31)                           
+                ifa->ifa_broadcast = ifa->ifa_address |            
+                             ~ifa->ifa_mask;                       
+       } else {
+           ifa->ifa_prefixlen = 32;
+           ifa->ifa_mask = inet_make_mask(32);
+       }
+       set_ifa_lifetime(ifa, INFINITY_LIFE_TIME, INFINITY_LIFE_TIME);
+       ret = inet_set_ifa(dev, ifa);
+       break;
+
+   case SIOCSIFBRDADDR:    /* Set the broadcast address */
+       ret = 0;
+       if (ifa->ifa_broadcast != sin->sin_addr.s_addr) {
+           inet_del_ifa(in_dev, ifap, 0);
+           ifa->ifa_broadcast = sin->sin_addr.s_addr;
+           inet_insert_ifa(ifa);
+       }
+       break;
+
+   case SIOCSIFDSTADDR:    /* Set the destination address */
+       ret = 0;
+       if (ifa->ifa_address == sin->sin_addr.s_addr)
+           break;
+       ret = -EINVAL;
+       if (inet_abc_len(sin->sin_addr.s_addr) < 0)
+           break;
+       ret = 0;
+       inet_del_ifa(in_dev, ifap, 0);
+       ifa->ifa_address = sin->sin_addr.s_addr;
+       inet_insert_ifa(ifa);
+       break;
+
+   case SIOCSIFNETMASK:    /* Set the netmask for the interface */
+
+       /*
+        *  The mask we set must be legal.
+        */
+       ret = -EINVAL;
+       if (bad_mask(sin->sin_addr.s_addr, 0))
+           break;
+       ret = 0;
+       if (ifa->ifa_mask != sin->sin_addr.s_addr) {
+           __be32 old_mask = ifa->ifa_mask;
+           inet_del_ifa(in_dev, ifap, 0);
+           ifa->ifa_mask = sin->sin_addr.s_addr;
+           ifa->ifa_prefixlen = inet_mask_len(ifa->ifa_mask);
+
+           /* See if current broadcast address matches
+            * with current netmask, then recalculate
+            * the broadcast address. Otherwise it's a
+            * funny address, so don't touch it since
+            * the user seems to know what (s)he's doing...
+            */
+           if ((dev->flags & IFF_BROADCAST) &&
+               (ifa->ifa_prefixlen < 31) &&
+               (ifa->ifa_broadcast ==
+                (ifa->ifa_local|~old_mask))) {
+               ifa->ifa_broadcast = (ifa->ifa_local |
+                             ~sin->sin_addr.s_addr);
+            }
+            inet_insert_ifa(ifa);
+        }
+        break;
+    }
+done:
+    rtnl_unlock();
+out:
+    return ret;
+rarok:
+    rtnl_unlock();
+    ret = copy_to_user(arg, &ifr, sizeof(struct ifreq)) ? -EFAULT : 0;
+    goto out;
+}
+```
+
+而 `dev_ioctl` 则是针对所有 IO 接口的各种操作。
 
 `net/core/dev_ioctl.c`
 
 ```
+/*
+ *  This function handles all "interface"-type I/O control requests. The actual
+ *  'doing' part of this is dev_ifsioc above.
+ */
 /**                                                                   
  *  dev_ioctl   -   network device ioctl                              
  *  @net: the applicable net namespace                                
